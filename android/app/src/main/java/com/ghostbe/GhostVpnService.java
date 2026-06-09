@@ -21,8 +21,12 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.DatagramPacket;
+import java.net.DatagramSocket;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Set;
@@ -33,6 +37,7 @@ public class GhostVpnService extends VpnService {
     private static volatile boolean running = false;
 
     private ParcelFileDescriptor tunFd;
+    private FileOutputStream tunOut;
     private Thread tunReadThread;
     private Thread tunWriteThread;
     private Thread miniProxyThread;
@@ -84,7 +89,9 @@ public class GhostVpnService extends VpnService {
             Builder builder = new Builder();
             builder.setSession("GhostBe")
                     .addAddress("10.0.0.2", 24)
-                    .addRoute("0.0.0.0", 0);
+                    .addRoute("0.0.0.0", 0)
+                    .addDnsServer("8.8.8.8")
+                    .addDnsServer("8.8.4.4");
 
             // Add allowed apps
             for (String pkg : selectedApps) {
@@ -102,6 +109,7 @@ public class GhostVpnService extends VpnService {
                 return;
             }
 
+            tunOut = new FileOutputStream(tunFd.getFileDescriptor());
             Log.d(TAG, "setupVPN: TUN interface established successfully");
 
             // Start reader and writer threads
@@ -230,6 +238,7 @@ public class GhostVpnService extends VpnService {
                 
                 if (length == 0) {
                     Log.w(TAG, "tunReader: TUN device returned 0 bytes");
+                    try { Thread.sleep(10); } catch (InterruptedException ignored) {}
                     continue;
                 }
                 
@@ -249,21 +258,20 @@ public class GhostVpnService extends VpnService {
         try {
             Log.d(TAG, "routePacket: Processing " + length + " byte packet");
             ByteBuffer buffer = ByteBuffer.wrap(packet, 0, length);
-            
+
             // Parse IPv4 header
             int version = (buffer.get(0) >> 4) & 0xf;
             Log.d(TAG, "routePacket: IP version=" + version);
-            
+
             if (version != 4) {
                 Log.d(TAG, "routePacket: Ignoring non-IPv4 packet (version " + version + ")");
-                return; // Only handle IPv4
+                return;
             }
 
-            int headerLength = (buffer.get(0) & 0xf) * 4;
+            int ipHeaderLen = (buffer.get(0) & 0xf) * 4;
             int protocol = buffer.get(9) & 0xff;
             Log.d(TAG, "routePacket: Protocol=" + protocol);
 
-            // Extract source and destination IPs (4 bytes each)
             byte[] srcIpBytes = new byte[4];
             byte[] dstIpBytes = new byte[4];
             buffer.position(12);
@@ -274,39 +282,69 @@ public class GhostVpnService extends VpnService {
             String dstIp = getIpString(dstIpBytes);
 
             if (protocol == 6) { // TCP
-                buffer.position(headerLength);
-                
-                // Extract port info
+                buffer.position(ipHeaderLen);
+
                 int srcPort = ((buffer.get() & 0xff) << 8) | (buffer.get() & 0xff);
                 int dstPort = ((buffer.get() & 0xff) << 8) | (buffer.get() & 0xff);
 
                 Log.i(TAG, "routePacket: TCP " + srcIp + ":" + srcPort + " -> " + dstIp + ":" + dstPort);
 
-                // Route TCP traffic to local proxy on port 8788
                 if (dstPort == 80 || dstPort == 443) {
                     Log.d(TAG, "routePacket: Routing to proxy (port " + dstPort + ")");
-                    // Forward to local proxy server
-                    try (Socket proxySocket = new Socket("127.0.0.1", 8788)) {
-                        // Send the packet payload to proxy
-                        int payloadLength = length - headerLength - 20; // TCP header is 20 bytes min
-                        if (payloadLength > 0) {
-                            byte[] payload = new byte[payloadLength];
-                            buffer.position(headerLength + 20);
-                            buffer.get(payload);
+
+                    int tcpHeaderLen = ((packet[ipHeaderLen + 12] >> 4) & 0xf) * 4;
+                    int payloadOffset = ipHeaderLen + tcpHeaderLen;
+                    int payloadLength = length - payloadOffset;
+
+                    if (payloadLength > 0) {
+                        byte[] payload = new byte[payloadLength];
+                        System.arraycopy(packet, payloadOffset, payload, 0, payloadLength);
+
+                        try (Socket proxySocket = new Socket("127.0.0.1", 8788)) {
+                            proxySocket.setSoTimeout(15000);
                             proxySocket.getOutputStream().write(payload);
                             proxySocket.getOutputStream().flush();
-                            Log.d(TAG, "routePacket: Sent " + payloadLength + " bytes to proxy");
-                        } else {
-                            Log.d(TAG, "routePacket: No payload in TCP packet (length=" + payloadLength + ")");
+                            Log.d(TAG, "routePacket: Sent " + payloadLength + " bytes to proxy, waiting for response...");
+
+                            byte[] responseBuf = new byte[65535];
+                            int responseLen = proxySocket.getInputStream().read(responseBuf);
+
+                            if (responseLen > 0) {
+                                Log.d(TAG, "routePacket: Received " + responseLen + " byte response from proxy");
+                                writeTunResponse(packet, length, responseBuf, responseLen,
+                                        ipHeaderLen, tcpHeaderLen, payloadOffset,
+                                        srcIpBytes, dstIpBytes, srcPort, dstPort);
+                            } else {
+                                Log.d(TAG, "routePacket: Empty response from proxy");
+                            }
+                        } catch (SocketTimeoutException e) {
+                            Log.w(TAG, "routePacket: Proxy response timed out after 15s");
+                        } catch (Exception e) {
+                            Log.w(TAG, "routePacket: Proxy communication error", e);
                         }
-                    } catch (Exception e) {
-                        Log.w(TAG, "routePacket: Failed to connect to proxy", e);
                     }
                 } else {
                     Log.d(TAG, "routePacket: TCP port " + dstPort + " not intercepted (only 80/443)");
                 }
             } else if (protocol == 17) { // UDP
-                Log.d(TAG, "routePacket: UDP packet - not intercepted");
+                buffer.position(ipHeaderLen);
+                int srcPort = ((buffer.get() & 0xff) << 8) | (buffer.get() & 0xff);
+                int dstPort = ((buffer.get() & 0xff) << 8) | (buffer.get() & 0xff);
+                Log.d(TAG, "routePacket: UDP " + srcIp + ":" + srcPort + " -> " + dstIp + ":" + dstPort);
+
+                if (dstPort == 53) {
+                    int udpHeaderLen = 8;
+                    int udpPayloadOffset = ipHeaderLen + udpHeaderLen;
+                    int udpPayloadLen = length - udpPayloadOffset;
+                    if (udpPayloadLen > 0) {
+                        byte[] payload = new byte[udpPayloadLen];
+                        System.arraycopy(packet, udpPayloadOffset, payload, 0, udpPayloadLen);
+                        forwardDnsQuery(payload, udpPayloadLen, srcIpBytes, dstIpBytes, srcPort, dstPort,
+                                packet, length, ipHeaderLen);
+                    }
+                } else {
+                    Log.d(TAG, "routePacket: UDP port " + dstPort + " not intercepted");
+                }
             } else {
                 Log.d(TAG, "routePacket: Protocol " + protocol + " not handled");
             }
@@ -315,16 +353,207 @@ public class GhostVpnService extends VpnService {
         }
     }
 
+    private void writeTunResponse(byte[] origPacket, int origLen, byte[] responseData, int responseLen,
+                                  int ipHeaderLen, int tcpHeaderLen, int payloadOffset,
+                                  byte[] srcIp, byte[] dstIp, int srcPort, int dstPort) {
+        try {
+            int newTcpLen = tcpHeaderLen + responseLen;
+            int newTotalLen = ipHeaderLen + newTcpLen;
+
+            byte[] outPacket = new byte[newTotalLen];
+
+            System.arraycopy(origPacket, 0, outPacket, 0, ipHeaderLen);
+
+            outPacket[2] = (byte) (newTotalLen >> 8);
+            outPacket[3] = (byte) (newTotalLen);
+
+            System.arraycopy(dstIp, 0, outPacket, 12, 4);
+            System.arraycopy(srcIp, 0, outPacket, 16, 4);
+
+            outPacket[10] = 0;
+            outPacket[11] = 0;
+
+            System.arraycopy(origPacket, ipHeaderLen, outPacket, ipHeaderLen, tcpHeaderLen);
+
+            outPacket[ipHeaderLen] = (byte) (dstPort >> 8);
+            outPacket[ipHeaderLen + 1] = (byte) (dstPort);
+            outPacket[ipHeaderLen + 2] = (byte) (srcPort >> 8);
+            outPacket[ipHeaderLen + 3] = (byte) (srcPort);
+
+            outPacket[ipHeaderLen + 13] = (byte) 0x18;
+
+            long origSeq = ((long) (origPacket[ipHeaderLen + 4] & 0xff) << 24) |
+                           ((long) (origPacket[ipHeaderLen + 5] & 0xff) << 16) |
+                           ((long) (origPacket[ipHeaderLen + 6] & 0xff) << 8) |
+                           ((long) (origPacket[ipHeaderLen + 7] & 0xff));
+            long origAck = ((long) (origPacket[ipHeaderLen + 8] & 0xff) << 24) |
+                           ((long) (origPacket[ipHeaderLen + 9] & 0xff) << 16) |
+                           ((long) (origPacket[ipHeaderLen + 10] & 0xff) << 8) |
+                           ((long) (origPacket[ipHeaderLen + 11] & 0xff));
+
+            int origPayloadLen = origLen - payloadOffset;
+
+            long respSeq = origAck;
+            long respAck = origSeq + origPayloadLen;
+
+            outPacket[ipHeaderLen + 4] = (byte) (respSeq >> 24);
+            outPacket[ipHeaderLen + 5] = (byte) (respSeq >> 16);
+            outPacket[ipHeaderLen + 6] = (byte) (respSeq >> 8);
+            outPacket[ipHeaderLen + 7] = (byte) (respSeq);
+
+            outPacket[ipHeaderLen + 8] = (byte) (respAck >> 24);
+            outPacket[ipHeaderLen + 9] = (byte) (respAck >> 16);
+            outPacket[ipHeaderLen + 10] = (byte) (respAck >> 8);
+            outPacket[ipHeaderLen + 11] = (byte) (respAck);
+
+            outPacket[ipHeaderLen + 16] = 0;
+            outPacket[ipHeaderLen + 17] = 0;
+
+            System.arraycopy(responseData, 0, outPacket, ipHeaderLen + tcpHeaderLen, responseLen);
+
+            int ipChecksum = calculateChecksum(outPacket, 0, ipHeaderLen);
+            outPacket[10] = (byte) (ipChecksum >> 8);
+            outPacket[11] = (byte) (ipChecksum);
+
+            int tcpChecksum = calculateTcpChecksum(outPacket, ipHeaderLen, newTcpLen);
+            outPacket[ipHeaderLen + 16] = (byte) (tcpChecksum >> 8);
+            outPacket[ipHeaderLen + 17] = (byte) (tcpChecksum);
+
+            synchronized (this) {
+                if (tunOut != null) {
+                    tunOut.write(outPacket);
+                    tunOut.flush();
+                    Log.d(TAG, "writeTunResponse: Wrote " + newTotalLen + " bytes to TUN");
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "writeTunResponse: Error", e);
+        }
+    }
+
+    private int calculateChecksum(byte[] buf, int offset, int length) {
+        int sum = 0;
+        int i = offset;
+        int end = offset + length;
+        while (i < end - 1) {
+            sum += ((buf[i] & 0xff) << 8) | (buf[i + 1] & 0xff);
+            i += 2;
+        }
+        if (i < end) {
+            sum += (buf[i] & 0xff) << 8;
+        }
+        while ((sum >> 16) > 0) {
+            sum = (sum & 0xffff) + (sum >> 16);
+        }
+        return ~sum & 0xffff;
+    }
+
+    private int calculateTcpChecksum(byte[] buf, int tcpOffset, int tcpLength) {
+        int sum = 0;
+
+        sum += ((buf[12] & 0xff) << 8) | (buf[13] & 0xff);
+        sum += ((buf[14] & 0xff) << 8) | (buf[15] & 0xff);
+        sum += ((buf[16] & 0xff) << 8) | (buf[17] & 0xff);
+        sum += ((buf[18] & 0xff) << 8) | (buf[19] & 0xff);
+
+        sum += 0x0006;
+        sum += tcpLength;
+
+        int end = tcpOffset + tcpLength;
+        int i = tcpOffset;
+        while (i < end - 1) {
+            sum += ((buf[i] & 0xff) << 8) | (buf[i + 1] & 0xff);
+            i += 2;
+        }
+        if (i < end) {
+            sum += (buf[i] & 0xff) << 8;
+        }
+
+        while ((sum >> 16) > 0) {
+            sum = (sum & 0xffff) + (sum >> 16);
+        }
+        return ~sum & 0xffff;
+    }
+
     private String getIpString(byte[] ip) {
         return (ip[0] & 0xff) + "." + (ip[1] & 0xff) + "." + (ip[2] & 0xff) + "." + (ip[3] & 0xff);
     }
 
     private void tunWriter() {
+    }
+
+    private void forwardDnsQuery(byte[] queryData, int queryLen, byte[] srcIp, byte[] dstIp,
+                                  int srcPort, int dstPort, byte[] origPacket, int origLen, int ipHeaderLen) {
         try {
-            FileOutputStream fos = new FileOutputStream(tunFd.getFileDescriptor());
-            // Write packets back (stub for now)
+            InetAddress dnsServer = InetAddress.getByAddress(dstIp);
+            Log.d(TAG, "forwardDnsQuery: Forwarding " + queryLen + " byte DNS query to " +
+                    getIpString(dstIp) + ":" + dstPort);
+
+            DatagramSocket socket = new DatagramSocket();
+            socket.setSoTimeout(5000);
+            DatagramPacket query = new DatagramPacket(queryData, queryLen, dnsServer, dstPort);
+            socket.send(query);
+
+            byte[] responseData = new byte[1500];
+            DatagramPacket response = new DatagramPacket(responseData, responseData.length);
+            socket.receive(response);
+            socket.close();
+
+            Log.d(TAG, "forwardDnsQuery: Received " + response.getLength() + " byte DNS response");
+            writeUdpTunResponse(origPacket, origLen, response.getData(), response.getLength(),
+                    ipHeaderLen, srcIp, dstIp, srcPort, dstPort);
+        } catch (SocketTimeoutException e) {
+            Log.w(TAG, "forwardDnsQuery: DNS query timed out");
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.w(TAG, "forwardDnsQuery: Error", e);
+        }
+    }
+
+    private void writeUdpTunResponse(byte[] origPacket, int origLen, byte[] responseData, int responseLen,
+                                     int ipHeaderLen, byte[] srcIp, byte[] dstIp, int srcPort, int dstPort) {
+        try {
+            int udpHeaderLen = 8;
+            int newTotalLen = ipHeaderLen + udpHeaderLen + responseLen;
+            byte[] outPacket = new byte[newTotalLen];
+
+            System.arraycopy(origPacket, 0, outPacket, 0, ipHeaderLen);
+
+            outPacket[2] = (byte) (newTotalLen >> 8);
+            outPacket[3] = (byte) (newTotalLen);
+
+            System.arraycopy(dstIp, 0, outPacket, 12, 4);
+            System.arraycopy(srcIp, 0, outPacket, 16, 4);
+
+            outPacket[10] = 0;
+            outPacket[11] = 0;
+
+            outPacket[ipHeaderLen] = (byte) (dstPort >> 8);
+            outPacket[ipHeaderLen + 1] = (byte) (dstPort);
+            outPacket[ipHeaderLen + 2] = (byte) (srcPort >> 8);
+            outPacket[ipHeaderLen + 3] = (byte) (srcPort);
+
+            int udpLen = udpHeaderLen + responseLen;
+            outPacket[ipHeaderLen + 4] = (byte) (udpLen >> 8);
+            outPacket[ipHeaderLen + 5] = (byte) (udpLen);
+
+            outPacket[ipHeaderLen + 6] = 0;
+            outPacket[ipHeaderLen + 7] = 0;
+
+            System.arraycopy(responseData, 0, outPacket, ipHeaderLen + udpHeaderLen, responseLen);
+
+            int ipChecksum = calculateChecksum(outPacket, 0, ipHeaderLen);
+            outPacket[10] = (byte) (ipChecksum >> 8);
+            outPacket[11] = (byte) (ipChecksum);
+
+            synchronized (this) {
+                if (tunOut != null) {
+                    tunOut.write(outPacket);
+                    tunOut.flush();
+                    Log.d(TAG, "writeUdpTunResponse: Wrote " + newTotalLen + " bytes to TUN");
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "writeUdpTunResponse: Error", e);
         }
     }
 
@@ -385,6 +614,10 @@ public class GhostVpnService extends VpnService {
         running = false;
 
         try {
+            if (tunOut != null) {
+                tunOut.close();
+                Log.d(TAG, "onDestroy: TUN output stream closed");
+            }
             if (tunFd != null) {
                 tunFd.close();
                 Log.d(TAG, "onDestroy: TUN file descriptor closed");
