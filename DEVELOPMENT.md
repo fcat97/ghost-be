@@ -21,13 +21,22 @@ npm run build
 
 ### Android Build
 
-Requires Android SDK. From project root:
+Requires:
+- Android SDK (API 33+)
+- Java 17 (Java 21 has jlink incompatibility with compileSdk 33)
+
+From project root:
 
 ```bash
 cd android
+# Switch to Java 17 (if using sdkman):
+sdk use java 17.0.9-jbr
+
 ./gradlew :app:assembleDebug
-# Output: app/build/outputs/apk/debug/app-debug.apk
+# Output: app/build/outputs/apk/debug/app-debug.apk (3.1 MB)
 ```
+
+**Note:** The Gradle wrapper is configured for compileSdk 33 with androidx.core 1.10.1. To upgrade to compileSdk 34, you'll need AGP 8.2.0+ and must use Java 17 (Java 21 jlink issues remain unresolved).
 
 ## Running Locally
 
