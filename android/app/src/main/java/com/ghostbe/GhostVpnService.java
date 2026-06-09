@@ -219,15 +219,27 @@ public class GhostVpnService extends VpnService {
             int length;
             int packetCount = 0;
 
-            while (running && (length = fis.read(packet)) > 0) {
-                packetCount++;
-                if (packetCount % 10 == 0) {
-                    Log.d(TAG, "tunReader: Received " + packetCount + " packets");
+            while (running) {
+                Log.d(TAG, "tunReader: Waiting for packet from TUN device...");
+                length = fis.read(packet);
+                
+                if (length == -1) {
+                    Log.w(TAG, "tunReader: TUN device returned EOF (length=-1)");
+                    break;
                 }
+                
+                if (length == 0) {
+                    Log.w(TAG, "tunReader: TUN device returned 0 bytes");
+                    continue;
+                }
+                
+                packetCount++;
+                Log.d(TAG, "tunReader: Received packet " + packetCount + ", length=" + length);
+                
                 // Parse IP packet and route to proxy
                 routePacket(packet, length);
             }
-            Log.d(TAG, "tunReader: Stopped after " + packetCount + " packets");
+            Log.d(TAG, "tunReader: Stopped after " + packetCount + " packets (running=" + running + ")");
         } catch (Exception e) {
             Log.e(TAG, "tunReader: Error", e);
         }
@@ -235,16 +247,21 @@ public class GhostVpnService extends VpnService {
 
     private void routePacket(byte[] packet, int length) {
         try {
+            Log.d(TAG, "routePacket: Processing " + length + " byte packet");
             ByteBuffer buffer = ByteBuffer.wrap(packet, 0, length);
             
             // Parse IPv4 header
             int version = (buffer.get(0) >> 4) & 0xf;
+            Log.d(TAG, "routePacket: IP version=" + version);
+            
             if (version != 4) {
+                Log.d(TAG, "routePacket: Ignoring non-IPv4 packet (version " + version + ")");
                 return; // Only handle IPv4
             }
 
             int headerLength = (buffer.get(0) & 0xf) * 4;
             int protocol = buffer.get(9) & 0xff;
+            Log.d(TAG, "routePacket: Protocol=" + protocol);
 
             // Extract source and destination IPs (4 bytes each)
             byte[] srcIpBytes = new byte[4];
@@ -263,7 +280,7 @@ public class GhostVpnService extends VpnService {
                 int srcPort = ((buffer.get() & 0xff) << 8) | (buffer.get() & 0xff);
                 int dstPort = ((buffer.get() & 0xff) << 8) | (buffer.get() & 0xff);
 
-                Log.d(TAG, "routePacket: TCP " + srcIp + ":" + srcPort + " -> " + dstIp + ":" + dstPort);
+                Log.i(TAG, "routePacket: TCP " + srcIp + ":" + srcPort + " -> " + dstIp + ":" + dstPort);
 
                 // Route TCP traffic to local proxy on port 8788
                 if (dstPort == 80 || dstPort == 443) {
@@ -279,13 +296,19 @@ public class GhostVpnService extends VpnService {
                             proxySocket.getOutputStream().write(payload);
                             proxySocket.getOutputStream().flush();
                             Log.d(TAG, "routePacket: Sent " + payloadLength + " bytes to proxy");
+                        } else {
+                            Log.d(TAG, "routePacket: No payload in TCP packet (length=" + payloadLength + ")");
                         }
                     } catch (Exception e) {
                         Log.w(TAG, "routePacket: Failed to connect to proxy", e);
                     }
                 } else {
-                    Log.d(TAG, "routePacket: Port " + dstPort + " not intercepted (only 80/443)");
+                    Log.d(TAG, "routePacket: TCP port " + dstPort + " not intercepted (only 80/443)");
                 }
+            } else if (protocol == 17) { // UDP
+                Log.d(TAG, "routePacket: UDP packet - not intercepted");
+            } else {
+                Log.d(TAG, "routePacket: Protocol " + protocol + " not handled");
             }
         } catch (Exception e) {
             Log.e(TAG, "routePacket: Error", e);
