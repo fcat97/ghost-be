@@ -1,16 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useWebSocket } from '../hooks/useWebSocket'
 
-interface TrafficEntry {
-  timestamp: string
-  app_package: string
-  method: string
-  url: string
-  response_status: number
-  latency_ms: number
-  mocked: boolean
-}
-
 interface AppOption {
   package: string
   request_count: number
