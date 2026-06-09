@@ -116,6 +116,20 @@ func processIPPacket(ctx *deviceCtx, conns map[string]*tcpConn, ipData []byte) {
 	}
 
 	protocol := ipData[9]
+
+	srcIP := ipData[12:16]
+	dstIP := ipData[16:20]
+
+	srcPort := int(ipData[ipHdrLen])<<8 | int(ipData[ipHdrLen+1])
+	dstPort := int(ipData[ipHdrLen+2])<<8 | int(ipData[ipHdrLen+3])
+
+	if protocol == 17 {
+		if dstPort == 53 {
+			forwardDNS(ctx, srcIP, dstIP, srcPort, dstPort, ipData, ipHdrLen)
+		}
+		return
+	}
+
 	if protocol != 6 {
 		return
 	}
@@ -123,12 +137,6 @@ func processIPPacket(ctx *deviceCtx, conns map[string]*tcpConn, ipData []byte) {
 	if len(ipData) < ipHdrLen+20 {
 		return
 	}
-
-	srcIP := ipData[12:16]
-	dstIP := ipData[16:20]
-
-	srcPort := int(ipData[ipHdrLen])<<8 | int(ipData[ipHdrLen+1])
-	dstPort := int(ipData[ipHdrLen+2])<<8 | int(ipData[ipHdrLen+3])
 
 	if dstPort != 80 && dstPort != 443 {
 		return
@@ -734,4 +742,71 @@ func extractSNIFromBytes(data []byte) string {
 
 func ipStr(ip []byte) string {
 	return fmt.Sprintf("%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3])
+}
+
+func forwardDNS(ctx *deviceCtx, srcIP, dstIP []byte, srcPort, dstPort int, ipData []byte, ipHdrLen int) {
+	udpOffset := ipHdrLen
+	if len(ipData) < udpOffset+8 {
+		return
+	}
+
+	udpLen := int(ipData[udpOffset+4])<<8 | int(ipData[udpOffset+5])
+	if udpLen < 8 || udpOffset+udpLen > len(ipData) {
+		return
+	}
+
+	payloadOffset := udpOffset + 8
+	payloadLen := udpLen - 8
+
+	dnsSrv := net.JoinHostPort(ipStr(dstIP), "53")
+	conn, err := net.Dial("udp", dnsSrv)
+	if err != nil {
+		return
+	}
+	defer conn.Close()
+
+	conn.SetDeadline(time.Now().Add(5 * time.Second))
+	if _, err := conn.Write(ipData[payloadOffset : payloadOffset+payloadLen]); err != nil {
+		return
+	}
+
+	respBuf := make([]byte, 1500)
+	n, err := conn.Read(respBuf)
+	if err != nil || n <= 0 {
+		return
+	}
+
+	udpRespLen := 8 + n
+	ipTotalLen := ipHdrLen + udpRespLen
+
+	out := make([]byte, ipTotalLen)
+
+	out[0] = 0x45
+	binary.BigEndian.PutUint16(out[2:4], uint16(ipTotalLen))
+	out[8] = 64
+	out[9] = 17
+	copy(out[12:16], dstIP)
+	copy(out[16:20], srcIP)
+
+	binary.BigEndian.PutUint16(out[udpOffset:], 53)
+	binary.BigEndian.PutUint16(out[udpOffset+2:], uint16(srcPort))
+	binary.BigEndian.PutUint16(out[udpOffset+4:], uint16(udpRespLen))
+	out[udpOffset+6] = 0
+	out[udpOffset+7] = 0
+
+	copy(out[payloadOffset:], respBuf[:n])
+
+	ipChecksum := checksum(out[0:ipHdrLen])
+	binary.BigEndian.PutUint16(out[10:12], ipChecksum)
+
+	writeRawTUN(ctx, out)
+}
+
+func writeRawTUN(ctx *deviceCtx, data []byte) {
+	ctx.mu.Lock()
+	defer ctx.mu.Unlock()
+	framed := make([]byte, 4+len(data))
+	binary.BigEndian.PutUint32(framed, uint32(len(data)))
+	copy(framed[4:], data)
+	ctx.conn.Write(framed)
 }
