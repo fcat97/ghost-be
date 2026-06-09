@@ -31,7 +31,10 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
+import java.util.Random;
 import java.util.Set;
 
 public class GhostVpnService extends VpnService {
@@ -49,6 +52,14 @@ public class GhostVpnService extends VpnService {
     private String hostIP;
     private int hostPort;
     private Set<String> selectedApps;
+    private final Map<String, TcpConnection> connections = new HashMap<>();
+    private final Random random = new Random();
+
+    private static class TcpConnection {
+        long clientSeq, serverSeq;
+        long clientAck, serverAck;
+        boolean established;
+    }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -302,26 +313,47 @@ public class GhostVpnService extends VpnService {
 
                 Log.i(TAG, "routePacket: TCP " + srcIp + ":" + srcPort + " -> " + dstIp + ":" + dstPort);
 
-                if (dstPort == 80 || dstPort == 443) {
-                    Log.d(TAG, "routePacket: Routing to proxy (port " + dstPort + ")");
-
+                if (dstPort != 80 && dstPort != 443) {
+                    Log.d(TAG, "routePacket: TCP port " + dstPort + " not intercepted (only 80/443)");
+                } else {
                     int tcpHeaderLen = ((packet[ipHeaderLen + 12] >> 4) & 0xf) * 4;
                     int payloadOffset = ipHeaderLen + tcpHeaderLen;
                     int payloadLength = length - payloadOffset;
+                    byte tcpFlags = packet[ipHeaderLen + 13];
+                    String connKey = srcIp + ":" + srcPort + "-" + dstIp + ":" + dstPort;
 
-                    if (payloadLength > 0) {
+                    if ((tcpFlags & 0x02) != 0 && (tcpFlags & 0x10) == 0) {
+                        handleSyn(packet, length, ipHeaderLen, connKey, srcIpBytes, dstIpBytes, srcPort, dstPort);
+                    } else if ((tcpFlags & 0x01) != 0 || (tcpFlags & 0x04) != 0) {
+                        connections.remove(connKey);
+                        Log.d(TAG, "routePacket: Connection closed: " + connKey);
+                    } else if (payloadLength > 0) {
+                        TcpConnection conn = connections.get(connKey);
+                        if (conn == null) {
+                            Log.d(TAG, "routePacket: No state for " + connKey + ", creating new");
+                            conn = new TcpConnection();
+                            conn.established = true;
+                            byte[] b = packet;
+                            conn.clientSeq = ((long)(b[ipHeaderLen + 4] & 0xff) << 24) |
+                                             ((long)(b[ipHeaderLen + 5] & 0xff) << 16) |
+                                             ((long)(b[ipHeaderLen + 6] & 0xff) << 8) |
+                                             ((long)(b[ipHeaderLen + 7] & 0xff));
+                            conn.serverSeq = random.nextLong() & 0xffffffffL;
+                            connections.put(connKey, conn);
+                        }
+                        if (!conn.established) {
+                            conn.established = true;
+                            Log.d(TAG, "routePacket: Connection established for " + connKey);
+                        }
                         byte[] payload = new byte[payloadLength];
                         System.arraycopy(packet, payloadOffset, payload, 0, payloadLength);
-
                         try (Socket proxySocket = new Socket("127.0.0.1", 8788)) {
                             proxySocket.setSoTimeout(15000);
                             proxySocket.getOutputStream().write(payload);
                             proxySocket.getOutputStream().flush();
                             Log.d(TAG, "routePacket: Sent " + payloadLength + " bytes to proxy, waiting for response...");
-
                             byte[] responseBuf = new byte[65535];
                             int responseLen = proxySocket.getInputStream().read(responseBuf);
-
                             if (responseLen > 0) {
                                 Log.d(TAG, "routePacket: Received " + responseLen + " byte response from proxy");
                                 writeTunResponse(packet, length, responseBuf, responseLen,
@@ -335,9 +367,13 @@ public class GhostVpnService extends VpnService {
                         } catch (Exception e) {
                             Log.w(TAG, "routePacket: Proxy communication error", e);
                         }
+                    } else {
+                        TcpConnection conn = connections.get(connKey);
+                        if (conn != null && !conn.established) {
+                            conn.established = true;
+                            Log.d(TAG, "routePacket: Connection established via ACK: " + connKey);
+                        }
                     }
-                } else {
-                    Log.d(TAG, "routePacket: TCP port " + dstPort + " not intercepted (only 80/443)");
                 }
             } else if (protocol == 17) { // UDP
                 buffer.position(ipHeaderLen);
@@ -363,6 +399,75 @@ public class GhostVpnService extends VpnService {
             }
         } catch (Exception e) {
             Log.e(TAG, "routePacket: Error", e);
+        }
+    }
+
+    private void handleSyn(byte[] packet, int length, int ipHeaderLen, String connKey,
+                           byte[] srcIp, byte[] dstIp, int srcPort, int dstPort) {
+        try {
+            long clientSeq = ((long)(packet[ipHeaderLen + 4] & 0xff) << 24) |
+                             ((long)(packet[ipHeaderLen + 5] & 0xff) << 16) |
+                             ((long)(packet[ipHeaderLen + 6] & 0xff) << 8) |
+                             ((long)(packet[ipHeaderLen + 7] & 0xff));
+
+            TcpConnection conn = new TcpConnection();
+            conn.clientSeq = clientSeq;
+            conn.serverSeq = random.nextLong() & 0xffffffffL;
+            conn.clientAck = clientSeq + 1;
+            conn.serverAck = conn.serverSeq;
+            conn.established = false;
+            connections.put(connKey, conn);
+
+            Log.d(TAG, "handleSyn: " + connKey + " clientSeq=" + clientSeq + " ourSeq=" + conn.serverSeq);
+
+            int synAckLen = ipHeaderLen + 20;
+            byte[] out = new byte[synAckLen];
+
+            System.arraycopy(packet, 0, out, 0, ipHeaderLen);
+            out[2] = (byte)(synAckLen >> 8);
+            out[3] = (byte)(synAckLen);
+            System.arraycopy(dstIp, 0, out, 12, 4);
+            System.arraycopy(srcIp, 0, out, 16, 4);
+            out[10] = 0;
+            out[11] = 0;
+
+            out[ipHeaderLen] = (byte)(dstPort >> 8);
+            out[ipHeaderLen + 1] = (byte)(dstPort);
+            out[ipHeaderLen + 2] = (byte)(srcPort >> 8);
+            out[ipHeaderLen + 3] = (byte)(srcPort);
+            out[ipHeaderLen + 4] = (byte)(conn.serverSeq >> 24);
+            out[ipHeaderLen + 5] = (byte)(conn.serverSeq >> 16);
+            out[ipHeaderLen + 6] = (byte)(conn.serverSeq >> 8);
+            out[ipHeaderLen + 7] = (byte)(conn.serverSeq);
+            out[ipHeaderLen + 8] = (byte)(conn.clientAck >> 24);
+            out[ipHeaderLen + 9] = (byte)(conn.clientAck >> 16);
+            out[ipHeaderLen + 10] = (byte)(conn.clientAck >> 8);
+            out[ipHeaderLen + 11] = (byte)(conn.clientAck);
+            out[ipHeaderLen + 12] = (byte)0x50;
+            out[ipHeaderLen + 13] = (byte)0x12;
+            out[ipHeaderLen + 14] = (byte)0xff;
+            out[ipHeaderLen + 15] = (byte)0xff;
+            out[ipHeaderLen + 16] = 0;
+            out[ipHeaderLen + 17] = 0;
+            out[ipHeaderLen + 18] = 0;
+            out[ipHeaderLen + 19] = 0;
+
+            int ipChk = calculateChecksum(out, 0, ipHeaderLen);
+            out[10] = (byte)(ipChk >> 8);
+            out[11] = (byte)(ipChk);
+            int tcpChk = calculateTcpChecksum(out, ipHeaderLen, 20);
+            out[ipHeaderLen + 16] = (byte)(tcpChk >> 8);
+            out[ipHeaderLen + 17] = (byte)(tcpChk);
+
+            synchronized (this) {
+                if (tunOut != null) {
+                    tunOut.write(out);
+                    tunOut.flush();
+                    Log.d(TAG, "handleSyn: Sent SYN-ACK to TUN for " + connKey);
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "handleSyn: Error", e);
         }
     }
 
