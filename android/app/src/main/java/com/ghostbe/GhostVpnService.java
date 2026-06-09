@@ -131,8 +131,20 @@ public class GhostVpnService extends VpnService {
                 server.getOutputStream().write(buffer, 0, read);
 
                 // Relay traffic
-                Thread clientToServer = new Thread(() -> relay(in, server.getOutputStream()));
-                Thread serverToClient = new Thread(() -> relay(server.getInputStream(), out));
+                Thread clientToServer = new Thread(() -> {
+                    try {
+                        relay(in, server.getOutputStream());
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                });
+                Thread serverToClient = new Thread(() -> {
+                    try {
+                        relay(server.getInputStream(), out);
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                });
 
                 clientToServer.start();
                 serverToClient.start();
@@ -213,7 +225,7 @@ public class GhostVpnService extends VpnService {
         return new NotificationCompat.Builder(this, CHANNEL_ID)
                 .setContentTitle("GhostBe VPN")
                 .setContentText("Active")
-                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setSmallIcon(R.drawable.ic_launcher)
                 .setContentIntent(pendingIntent)
                 .build();
     }

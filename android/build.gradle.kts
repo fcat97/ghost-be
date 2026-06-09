@@ -1,11 +1,10 @@
 plugins {
     id("com.android.application") version "8.1.0"
-    kotlin("android") version "1.9.0"
 }
 
 android {
     namespace = "com.ghostbe"
-    compileSdk = 34
+    compileSdk = 33
 
     defaultConfig {
         applicationId = "com.ghostbe"
