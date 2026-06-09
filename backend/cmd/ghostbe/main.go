@@ -15,6 +15,7 @@ import (
 	"github.com/ghostbe/backend/internal/certs"
 	"github.com/ghostbe/backend/internal/db"
 	"github.com/ghostbe/backend/internal/proxy"
+	"github.com/ghostbe/backend/internal/tun"
 )
 
 func main() {
@@ -73,6 +74,16 @@ func main() {
 		log.Printf("Starting MITM proxy on :%d", port)
 		if err := pxy.Start(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("proxy server error: %v", err)
+		}
+	}()
+
+	// Start TUN server
+	tunAddr := fmt.Sprintf("127.0.0.1:%d", port)
+	tunServer := tun.New(port-1, tunAddr)
+	go func() {
+		log.Printf("Starting TUN server on :%d", port-1)
+		if err := tunServer.Start(); err != nil {
+			log.Fatalf("TUN server error: %v", err)
 		}
 	}()
 

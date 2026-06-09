@@ -1,6 +1,7 @@
 # Go build artifacts
 /backend/bin/
 /backend/dist/
+/backend/ghostbe
 /backend/*.exe
 /backend/*.dll
 /backend/*.so
