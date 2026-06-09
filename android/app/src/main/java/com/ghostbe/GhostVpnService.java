@@ -10,6 +10,9 @@ import android.content.SharedPreferences;
 import android.net.VpnService;
 import android.os.Build;
 import android.os.ParcelFileDescriptor;
+import android.system.ErrnoException;
+import android.system.Os;
+import android.system.OsConstants;
 import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
@@ -110,6 +113,16 @@ public class GhostVpnService extends VpnService {
             }
 
             tunOut = new FileOutputStream(tunFd.getFileDescriptor());
+
+            try {
+                Os.fcntlInt(tunFd.getFileDescriptor(), OsConstants.F_SETFL,
+                        Os.fcntlInt(tunFd.getFileDescriptor(), OsConstants.F_GETFL, 0)
+                                & ~OsConstants.O_NONBLOCK);
+                Log.d(TAG, "setupVPN: TUN fd set to blocking mode");
+            } catch (ErrnoException e) {
+                Log.w(TAG, "setupVPN: Could not set TUN fd to blocking mode", e);
+            }
+
             Log.d(TAG, "setupVPN: TUN interface established successfully");
 
             // Start reader and writer threads
