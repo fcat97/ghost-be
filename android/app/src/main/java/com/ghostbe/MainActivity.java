@@ -4,13 +4,15 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.VpnService;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
-
 import androidx.appcompat.app.AppCompatActivity;
 
 public class MainActivity extends AppCompatActivity {
+
     private EditText hostInput;
     private EditText portInput;
     private Button connectBtn;
@@ -92,10 +94,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateStatus() {
-        boolean isRunning = GhostVpnService.isRunning();
-        statusText.setText(isRunning ? "Connected" : "Disconnected");
-        connectBtn.setEnabled(!isRunning);
-        disconnectBtn.setEnabled(isRunning);
+        Handler handler = new Handler(Looper.getMainLooper());
+        handler.postDelayed(() -> {
+            boolean isRunning = GhostVpnService.isRunning();
+            statusText.setText(isRunning ? "Connected" : "Disconnected");
+            connectBtn.setEnabled(!isRunning);
+            disconnectBtn.setEnabled(isRunning);
+        }, 1000);
     }
 
     @Override
@@ -105,7 +110,11 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+    protected void onActivityResult(
+        int requestCode,
+        int resultCode,
+        Intent data
+    ) {
         super.onActivityResult(requestCode, resultCode, data);
         if (resultCode == RESULT_OK) {
             startVPN();

@@ -33,6 +33,10 @@ cd android
 sdk use java 17.0.9-jbr
 
 ./gradlew :app:assembleDebug
+adb install -r app/build/outputs/apk/debug/app-debug.apk && adb shell am start -n com.ghostbe/.MainActivity
+
+# build + install + run + adb
+./gradlew app:assembleDebug && adb install -r app/build/outputs/apk/debug/app-debug.apk && adb shell am start -n com.ghostbe/.MainActivity && sleep 2 && adb logcat --pid=$(adb shell pidof -s com.ghostbe)
 # Output: app/build/outputs/apk/debug/app-debug.apk (3.1 MB)
 ```
 
@@ -192,4 +196,3 @@ npm run dev  # HMR enabled
 - [ ] Add dashboard with statistics charts
 - [ ] Support for proxy chaining
 - [ ] Request filtering and search
-

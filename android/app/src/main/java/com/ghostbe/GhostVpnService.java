@@ -10,6 +10,7 @@ import android.content.SharedPreferences;
 import android.net.VpnService;
 import android.os.Build;
 import android.os.ParcelFileDescriptor;
+import android.util.Log;
 
 import androidx.core.app.NotificationCompat;
 
@@ -43,6 +44,7 @@ public class GhostVpnService extends VpnService {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
+        Log.d(TAG, "=== VPN Service Starting ===");
         startForeground(1, createNotification());
 
         SharedPreferences prefs = getSharedPreferences("ghostbe", MODE_PRIVATE);
@@ -50,8 +52,14 @@ public class GhostVpnService extends VpnService {
         hostPort = prefs.getInt("port", 8877);
 
         selectedApps = loadSelectedApps();
+        Log.d(TAG, "Backend: " + hostIP + ":" + hostPort);
+        Log.d(TAG, "Selected apps: " + selectedApps.size());
+        for (String app : selectedApps) {
+            Log.d(TAG, "  - " + app);
+        }
 
         if (hostIP.isEmpty()) {
+            Log.e(TAG, "Error: No backend host configured!");
             stopSelf();
             return START_NOT_STICKY;
         }
@@ -59,10 +67,12 @@ public class GhostVpnService extends VpnService {
         running = true;
 
         // Start mini proxy
+        Log.d(TAG, "Starting mini proxy on port 8788...");
         miniProxyThread = new Thread(() -> startMiniProxy());
         miniProxyThread.start();
 
         // Setup VPN
+        Log.d(TAG, "Setting up VPN...");
         setupVPN();
 
         return START_STICKY;
@@ -70,6 +80,7 @@ public class GhostVpnService extends VpnService {
 
     private void setupVPN() {
         try {
+            Log.d(TAG, "setupVPN: Creating VPN interface...");
             Builder builder = new Builder();
             builder.setSession("GhostBe")
                     .addAddress("10.0.0.2", 24)
@@ -79,15 +90,19 @@ public class GhostVpnService extends VpnService {
             for (String pkg : selectedApps) {
                 try {
                     builder.addAllowedApplication(pkg);
+                    Log.d(TAG, "setupVPN: Added app " + pkg);
                 } catch (Exception e) {
-                    e.printStackTrace();
+                    Log.w(TAG, "setupVPN: Failed to add app " + pkg, e);
                 }
             }
 
             tunFd = builder.establish();
             if (tunFd == null) {
+                Log.e(TAG, "setupVPN: Failed to establish TUN interface!");
                 return;
             }
+
+            Log.d(TAG, "setupVPN: TUN interface established successfully");
 
             // Start reader and writer threads
             tunReadThread = new Thread(() -> tunReader());
@@ -96,20 +111,27 @@ public class GhostVpnService extends VpnService {
             tunReadThread.start();
             tunWriteThread.start();
 
+            Log.d(TAG, "setupVPN: TUN reader and writer threads started");
+
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e(TAG, "setupVPN: Error", e);
         }
     }
 
     private void startMiniProxy() {
         try {
+            Log.d(TAG, "startMiniProxy: Starting server on port 8788...");
             miniProxySocket = new ServerSocket(8788);
+            Log.i(TAG, "startMiniProxy: Server listening on port 8788");
+            
             while (running) {
+                Log.d(TAG, "startMiniProxy: Waiting for client connection...");
                 Socket client = miniProxySocket.accept();
+                Log.i(TAG, "startMiniProxy: Client connected from " + client.getInetAddress());
                 new Thread(() -> handleMiniProxyClient(client)).start();
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e(TAG, "startMiniProxy: Error", e);
         }
     }
 
@@ -118,31 +140,41 @@ public class GhostVpnService extends VpnService {
             InputStream in = client.getInputStream();
             OutputStream out = client.getOutputStream()
         ) {
+            Log.d(TAG, "handleMiniProxyClient: Processing request...");
+            
             // Read first line to determine HTTP or HTTPS
             byte[] buffer = new byte[1024];
             int read = in.read(buffer);
             String firstLine = new String(buffer, 0, read).split("\n")[0];
+            Log.d(TAG, "handleMiniProxyClient: First line: " + firstLine);
 
             // Determine app package (for now, use first selected app)
             String appPackage = selectedApps.isEmpty() ? "unknown" : selectedApps.iterator().next();
+            Log.d(TAG, "handleMiniProxyClient: App package: " + appPackage);
 
             // Forward to host proxy
+            Log.d(TAG, "handleMiniProxyClient: Connecting to backend " + hostIP + ":" + hostPort);
             try (Socket server = new Socket(hostIP, hostPort)) {
+                Log.i(TAG, "handleMiniProxyClient: Connected to backend");
                 server.getOutputStream().write(buffer, 0, read);
 
                 // Relay traffic
                 Thread clientToServer = new Thread(() -> {
                     try {
+                        Log.d(TAG, "handleMiniProxyClient: Starting client-to-server relay...");
                         relay(in, server.getOutputStream());
+                        Log.d(TAG, "handleMiniProxyClient: Client-to-server relay completed");
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        Log.e(TAG, "handleMiniProxyClient: Client-to-server relay error", e);
                     }
                 });
                 Thread serverToClient = new Thread(() -> {
                     try {
+                        Log.d(TAG, "handleMiniProxyClient: Starting server-to-client relay...");
                         relay(server.getInputStream(), out);
+                        Log.d(TAG, "handleMiniProxyClient: Server-to-client relay completed");
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        Log.e(TAG, "handleMiniProxyClient: Server-to-client relay error", e);
                     }
                 });
 
@@ -151,9 +183,13 @@ public class GhostVpnService extends VpnService {
 
                 clientToServer.join();
                 serverToClient.join();
+                
+                Log.d(TAG, "handleMiniProxyClient: Request completed");
+            } catch (Exception e) {
+                Log.e(TAG, "handleMiniProxyClient: Failed to connect to backend", e);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e(TAG, "handleMiniProxyClient: Error", e);
         }
     }
 
@@ -161,27 +197,39 @@ public class GhostVpnService extends VpnService {
         try {
             byte[] buffer = new byte[4096];
             int read;
+            int totalBytes = 0;
+            
             while ((read = in.read(buffer)) != -1) {
                 out.write(buffer, 0, read);
                 out.flush();
+                totalBytes += read;
             }
+            
+            Log.d(TAG, "relay: Relay completed, total bytes: " + totalBytes);
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e(TAG, "relay: Error", e);
         }
     }
 
     private void tunReader() {
         try {
+            Log.d(TAG, "tunReader: Starting packet reader...");
             FileInputStream fis = new FileInputStream(tunFd.getFileDescriptor());
             byte[] packet = new byte[32767];
             int length;
+            int packetCount = 0;
 
             while (running && (length = fis.read(packet)) > 0) {
+                packetCount++;
+                if (packetCount % 10 == 0) {
+                    Log.d(TAG, "tunReader: Received " + packetCount + " packets");
+                }
                 // Parse IP packet and route to proxy
                 routePacket(packet, length);
             }
+            Log.d(TAG, "tunReader: Stopped after " + packetCount + " packets");
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e(TAG, "tunReader: Error", e);
         }
     }
 
@@ -215,8 +263,11 @@ public class GhostVpnService extends VpnService {
                 int srcPort = ((buffer.get() & 0xff) << 8) | (buffer.get() & 0xff);
                 int dstPort = ((buffer.get() & 0xff) << 8) | (buffer.get() & 0xff);
 
+                Log.d(TAG, "routePacket: TCP " + srcIp + ":" + srcPort + " -> " + dstIp + ":" + dstPort);
+
                 // Route TCP traffic to local proxy on port 8788
                 if (dstPort == 80 || dstPort == 443) {
+                    Log.d(TAG, "routePacket: Routing to proxy (port " + dstPort + ")");
                     // Forward to local proxy server
                     try (Socket proxySocket = new Socket("127.0.0.1", 8788)) {
                         // Send the packet payload to proxy
@@ -227,14 +278,17 @@ public class GhostVpnService extends VpnService {
                             buffer.get(payload);
                             proxySocket.getOutputStream().write(payload);
                             proxySocket.getOutputStream().flush();
+                            Log.d(TAG, "routePacket: Sent " + payloadLength + " bytes to proxy");
                         }
                     } catch (Exception e) {
-                        // Proxy connection failed, continue
+                        Log.w(TAG, "routePacket: Failed to connect to proxy", e);
                     }
+                } else {
+                    Log.d(TAG, "routePacket: Port " + dstPort + " not intercepted (only 80/443)");
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e(TAG, "routePacket: Error", e);
         }
     }
 
@@ -304,19 +358,36 @@ public class GhostVpnService extends VpnService {
 
     @Override
     public void onDestroy() {
+        Log.d(TAG, "=== VPN Service Stopping ===");
         running = false;
 
         try {
-            if (tunFd != null) tunFd.close();
-            if (miniProxySocket != null) miniProxySocket.close();
-            if (tunReadThread != null) tunReadThread.join(1000);
-            if (tunWriteThread != null) tunWriteThread.join(1000);
-            if (miniProxyThread != null) miniProxyThread.join(1000);
+            if (tunFd != null) {
+                tunFd.close();
+                Log.d(TAG, "onDestroy: TUN file descriptor closed");
+            }
+            if (miniProxySocket != null) {
+                miniProxySocket.close();
+                Log.d(TAG, "onDestroy: Mini proxy socket closed");
+            }
+            if (tunReadThread != null) {
+                tunReadThread.join(1000);
+                Log.d(TAG, "onDestroy: TUN reader thread stopped");
+            }
+            if (tunWriteThread != null) {
+                tunWriteThread.join(1000);
+                Log.d(TAG, "onDestroy: TUN writer thread stopped");
+            }
+            if (miniProxyThread != null) {
+                miniProxyThread.join(1000);
+                Log.d(TAG, "onDestroy: Mini proxy thread stopped");
+            }
         } catch (Exception e) {
-            e.printStackTrace();
+            Log.e(TAG, "onDestroy: Error", e);
         }
 
         super.onDestroy();
+        Log.i(TAG, "VPN Service destroyed");
     }
 
     public static boolean isRunning() {
