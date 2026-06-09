@@ -15,7 +15,6 @@ import (
 	"github.com/ghostbe/backend/internal/certs"
 	"github.com/ghostbe/backend/internal/db"
 	"github.com/ghostbe/backend/internal/proxy"
-	"github.com/ghostbe/backend/internal/rules"
 )
 
 func main() {
@@ -61,9 +60,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to load rules: %v", err)
 	}
-
-	// Initialize rules engine
-	ruleEngine := rules.New(initialRules)
 
 	// Initialize proxy
 	pxy := proxy.New(port, database, certMgr)

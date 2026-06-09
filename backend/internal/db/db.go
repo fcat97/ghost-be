@@ -2,7 +2,6 @@ package db
 
 import (
 	"database/sql"
-	"fmt"
 	"time"
 
 	_ "github.com/mattn/go-sqlite3"
@@ -85,7 +84,7 @@ type TrafficLog struct {
 	RequestBody    *string   `json:"request_body"`
 	ResponseStatus int       `json:"response_status"`
 	ResponseBody   *string   `json:"response_body"`
-	LatencyMs      int       `json:"latency_ms"`
+	LatencyMs      int64     `json:"latency_ms"`
 	Mocked         bool      `json:"mocked"`
 }
 

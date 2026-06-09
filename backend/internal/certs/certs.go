@@ -35,7 +35,7 @@ func New(dataDir string) (*Manager, error) {
 	var err error
 
 	// Try to load existing CA
-	if _, err := os.Stat(caCertPath); err == nil && os.IsExist(err) == false {
+	if _, statErr := os.Stat(caCertPath); statErr == nil {
 		caCert, caKey, err = loadCA(caCertPath, caKeyPath)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load CA: %w", err)
