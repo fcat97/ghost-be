@@ -109,6 +109,8 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
         if (resultCode == RESULT_OK) {
             startVPN();
+            // Ensure status is updated after service starts
+            updateStatus();
         }
     }
 }

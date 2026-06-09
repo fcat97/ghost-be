@@ -9,7 +9,6 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.VpnService;
 import android.os.Build;
-import android.os.Bundle;
 import android.os.ParcelFileDescriptor;
 
 import androidx.core.app.NotificationCompat;
@@ -23,6 +22,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.nio.ByteBuffer;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -177,18 +177,75 @@ public class GhostVpnService extends VpnService {
             int length;
 
             while (running && (length = fis.read(packet)) > 0) {
-                // Parse IP packet and extract TCP destination
-                // For now, just read packets
+                // Parse IP packet and route to proxy
+                routePacket(packet, length);
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
     }
 
+    private void routePacket(byte[] packet, int length) {
+        try {
+            ByteBuffer buffer = ByteBuffer.wrap(packet, 0, length);
+            
+            // Parse IPv4 header
+            int version = (buffer.get(0) >> 4) & 0xf;
+            if (version != 4) {
+                return; // Only handle IPv4
+            }
+
+            int headerLength = (buffer.get(0) & 0xf) * 4;
+            int protocol = buffer.get(9) & 0xff;
+
+            // Extract source and destination IPs (4 bytes each)
+            byte[] srcIpBytes = new byte[4];
+            byte[] dstIpBytes = new byte[4];
+            buffer.position(12);
+            buffer.get(srcIpBytes);
+            buffer.get(dstIpBytes);
+
+            String srcIp = getIpString(srcIpBytes);
+            String dstIp = getIpString(dstIpBytes);
+
+            if (protocol == 6) { // TCP
+                buffer.position(headerLength);
+                
+                // Extract port info
+                int srcPort = ((buffer.get() & 0xff) << 8) | (buffer.get() & 0xff);
+                int dstPort = ((buffer.get() & 0xff) << 8) | (buffer.get() & 0xff);
+
+                // Route TCP traffic to local proxy on port 8788
+                if (dstPort == 80 || dstPort == 443) {
+                    // Forward to local proxy server
+                    try (Socket proxySocket = new Socket("127.0.0.1", 8788)) {
+                        // Send the packet payload to proxy
+                        int payloadLength = length - headerLength - 20; // TCP header is 20 bytes min
+                        if (payloadLength > 0) {
+                            byte[] payload = new byte[payloadLength];
+                            buffer.position(headerLength + 20);
+                            buffer.get(payload);
+                            proxySocket.getOutputStream().write(payload);
+                            proxySocket.getOutputStream().flush();
+                        }
+                    } catch (Exception e) {
+                        // Proxy connection failed, continue
+                    }
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private String getIpString(byte[] ip) {
+        return (ip[0] & 0xff) + "." + (ip[1] & 0xff) + "." + (ip[2] & 0xff) + "." + (ip[3] & 0xff);
+    }
+
     private void tunWriter() {
         try {
             FileOutputStream fos = new FileOutputStream(tunFd.getFileDescriptor());
-            // Write packets back
+            // Write packets back (stub for now)
         } catch (Exception e) {
             e.printStackTrace();
         }
