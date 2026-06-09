@@ -101,6 +101,15 @@ public class GhostVpnService extends VpnService {
                 Log.w(TAG, "Could not set blocking mode", e);
             }
 
+            new Thread(() -> connectToBackend()).start();
+
+        } catch (Exception e) {
+            Log.e(TAG, "setupVPN error", e);
+        }
+    }
+
+    private void connectToBackend() {
+        try {
             int tunPort = hostPort - 1;
             Log.d(TAG, "Connecting to backend " + hostIP + ":" + tunPort);
             backendSocket = new Socket(hostIP, tunPort);
@@ -118,9 +127,8 @@ public class GhostVpnService extends VpnService {
             backendReadThread = new Thread(() -> backendReader());
             tunReadThread.start();
             backendReadThread.start();
-
         } catch (Exception e) {
-            Log.e(TAG, "setupVPN error", e);
+            Log.e(TAG, "connectToBackend error", e);
         }
     }
 
