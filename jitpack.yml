@@ -6,4 +6,4 @@ before_install:
   - ./scripts/jitpack-accept-android-licenses.sh
 
 install:
-  - ./kotlin publish mavenLocal -m client
+  - ./scripts/jitpack-publish-client.sh
