@@ -1,0 +1,16 @@
+product: android/app
+
+dependencies:
+  - $compose.runtime
+  - $compose.foundation
+  - $compose.material3
+  - $compose.ui
+  - $compose.uiTooling
+  - $libs.androidx.activity.compose
+  - com.squareup.okhttp3:okhttp:4.12.0
+
+settings:
+  compose: enabled
+  android:
+    namespace: dev.yellobytes.ghostbe.demoapp
+    applicationId: dev.yellobytes.ghostbe.demoapp
