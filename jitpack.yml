@@ -3,7 +3,7 @@ jdk:
 
 before_install:
   - 'sed -i "s/version: .*/version: ${VERSION}/" client/module.yaml'
-  - echo "ANDROID_HOME=$ANDROID_HOME"; ls "$ANDROID_HOME/cmdline-tools/" 2>&1; yes | $ANDROID_HOME/cmdline-tools/*/bin/sdkmanager --licenses 2>&1; echo "sdkmanager exit=$?"
+  - ./scripts/jitpack-accept-android-licenses.sh
 
 install:
   - ./kotlin publish mavenLocal -m client
