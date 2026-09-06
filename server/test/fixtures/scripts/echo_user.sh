@@ -1,0 +1,3 @@
+#!/bin/sh
+read -r input
+echo '{"status":201,"headers":{"Content-Type":"application/json"},"body":"eyJvayI6dHJ1ZX0="}'

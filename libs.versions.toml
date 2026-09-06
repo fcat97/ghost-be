@@ -1,0 +1,5 @@
+[versions]
+androidx-activity-compose = "1.13.0"
+
+[libraries]
+androidx-activity-compose = { module = "androidx.activity:activity-compose", version.ref = "androidx-activity-compose" }

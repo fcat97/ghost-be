@@ -1,0 +1,18 @@
+product:
+  type: linux/app
+  platforms: [ linuxX64 ]
+
+dependencies:
+  - $ktor.server.core
+  - $ktor.server.cio
+  - com.charleskorn.kaml:kaml:0.61.0
+
+test-dependencies:
+  - $ktor.server.testHost
+
+settings:
+  ktor: enabled
+  kotlin:
+    serialization: json
+  native:
+    entryPoint: ghostbe.server.main

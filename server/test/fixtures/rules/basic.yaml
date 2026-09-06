@@ -1,0 +1,19 @@
+rules:
+  - name: get-user-42
+    match:
+      method: GET
+      path: /v1/users/42
+      query: { active: "true" }
+      headers: { X-Feature-Flag: "beta" }
+    response:
+      file: responses/user-42.json
+      status: 200
+      headers: { Content-Type: application/json }
+
+  - name: dynamic-user
+    match:
+      method: GET
+      pathPattern: "/v1/users/{id}"
+    response:
+      script: scripts/dynamic_user.py
+      status: 200

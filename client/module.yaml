@@ -1,0 +1,15 @@
+product:
+  type: kmp/lib
+  platforms: [ android ]
+
+dependencies:
+  - com.squareup.okhttp3:okhttp:4.12.0
+
+test-dependencies:
+  - com.squareup.okhttp3:mockwebserver3:5.0.0-alpha.14
+
+settings:
+  android:
+    namespace: dev.yellobytes.ghostbe.client
+  kotlin:
+    serialization: json
