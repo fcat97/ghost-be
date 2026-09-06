@@ -30,7 +30,7 @@
 - Create: `server/src/Main.kt`
 
 **Interfaces:**
-- Produces: a runnable `linux/app` module named `server`, entry point `ghostbe.server.MainKt.main`.
+- Produces: a runnable `linux/app` module named `server`, entry point `ghostbe.server.main`.
 
 - [ ] **Step 1: Write `project.yaml`**
 
@@ -55,7 +55,7 @@ dependencies:
 settings:
   ktor: enabled
   native:
-    entryPoint: ghostbe.server.MainKt.main
+    entryPoint: ghostbe.server.main
 ```
 
 - [ ] **Step 3: Write a placeholder `server/src/Main.kt`**

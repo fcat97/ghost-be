@@ -1,3 +1,4 @@
 modules:
   - client
   - demo-app
+  - server
