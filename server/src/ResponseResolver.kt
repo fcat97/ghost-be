@@ -48,7 +48,6 @@ class ResponseResolver(
         }
     }
 
-    @OptIn(ExperimentalEncodingApi::class)
     private fun resolveScript(ruleName: String, spec: ResponseSpec, envelope: RequestEnvelope): ResolvedResponse {
         val scriptRelativePath = spec.script!!
         val extension = scriptRelativePath.substringAfterLast('.', missingDelimiterValue = "")

@@ -8,7 +8,6 @@ import io.ktor.server.routing.*
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
-@OptIn(ExperimentalEncodingApi::class)
 fun Route.interceptRoute(rules: List<Rule>, resolver: ResponseResolver) {
     post("/intercept") {
         val body = call.receiveText()
