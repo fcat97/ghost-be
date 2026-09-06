@@ -1,1 +1,0 @@
-{"root":["./src/App.tsx","./src/main.tsx","./src/hooks/useRules.ts","./src/hooks/useWebSocket.ts","./src/pages/Apps.tsx","./src/pages/Rules.tsx","./src/pages/Settings.tsx","./src/pages/Traffic.tsx"],"version":"5.9.3"}

@@ -1,34 +1,6 @@
-# Go build artifacts
-/backend/bin/
-/backend/dist/
-/backend/ghostbe
-/backend/*.exe
-/backend/*.dll
-/backend/*.so
-/backend/*.dylib
-
-# Go module cache
-/backend/vendor/
-/backend/go.sum.lock
-
-# Local data directory
-/backend/data/
-/backend/*.db
-/backend/*.db-wal
-/backend/*.db-shm
-
-# Frontend build artifacts
-/frontend/dist/
-/frontend/build/
-/frontend/.next/
-
-# Node modules
-/frontend/node_modules/
-/node_modules/
-
-# npm logs
-/frontend/npm-debug.log
-/frontend/yarn-error.log
+# Node modules (demo-backend)
+/demo-backend/node_modules/
+node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
@@ -46,26 +18,6 @@ yarn-error.log*
 *.swo
 *~
 .DS_Store
-
-# Android build artifacts
-/android/.gradle/
-/android/local.properties
-/android/.idea/
-/android/*.iml
-/android/build/
-/android/.DS_Store
-/android/app/build/
-/android/.cxx/
-
-# Android intermediates
-/android/.externalNativeBuild/
-
-# Kotlin
-/android/src/**/*.class
-/android/src/**/*.jar
-
-# Gradle build cache
-/android/.gradle/
 
 # Temp files
 *.tmp
