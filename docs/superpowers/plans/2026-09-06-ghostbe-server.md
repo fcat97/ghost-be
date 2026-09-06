@@ -443,7 +443,7 @@ class MatcherTest {
     }
 
     @Test
-    fun `requires only the listed query params to match, ignoring extras`() {
+    fun `requires only the listed query params to match ignoring extras`() {
         val rules = listOf(rule("r1", "GET", path = "/v1/users/42", query = mapOf("active" to "true")))
         val result = matchRule(
             envelope("GET", "https://api.example.com/v1/users/42?active=true&extra=1"),
@@ -459,7 +459,7 @@ class MatcherTest {
     }
 
     @Test
-    fun `requires only the listed headers to match, ignoring extras`() {
+    fun `requires only the listed headers to match ignoring extras`() {
         val rules = listOf(rule("r1", "GET", path = "/v1/users/42", headers = mapOf("X-Feature-Flag" to "beta")))
         val result = matchRule(
             envelope("GET", "https://api.example.com/v1/users/42", headers = mapOf("X-Feature-Flag" to "beta", "Accept" to "*/*")),
@@ -708,7 +708,7 @@ import kotlin.test.assertEquals
 
 class ProcessTest {
     @Test
-    fun `runs a command, feeds it stdin, and captures stdout and exit code`() {
+    fun `runs a command feeds it stdin and captures stdout and exit code`() {
         // `cat` echoes stdin back to stdout unmodified — a minimal, always-available
         // way to verify the stdin-write / stdout-read plumbing without a real script.
         val result = runProcess(command = "cat", arg = "", stdin = "hello ghost-be")
