@@ -84,6 +84,12 @@ rules:
 Requests that don't match any rule are passed straight through to your real
 backend — you only need a rule for the cases you actually want to mock.
 
+`ghost-be` watches your rules directory and reloads automatically whenever a
+file changes — no restart needed after editing a rule or adding a new one. A
+rule file that's briefly invalid mid-edit just gets skipped (with a message
+on stdout); `ghost-be` keeps serving the last good set of rules until the
+file is valid again.
+
 `match` can also filter on specific query params or headers, and `path` can
 be a pattern like `/v1/users/{id}` for matching a family of URLs. See the
 [design spec](docs/superpowers/specs/2026-09-06-okhttp-interceptor-design.md#6-rule-configuration)

@@ -5,15 +5,15 @@ import kotlin.test.assertTrue
 import okio.FileSystem
 import okio.Path.Companion.toPath
 
-class InotifyProbeTest {
+class RuleWatcherTest {
     @Test
     fun `read returns with bytes after a file change once the watch exists`() {
         val dir = "test/fixtures/responses".toPath()
-        val fd = createWatch(dir.toString())
+        val fd = createRulesWatch(dir.toString())
         val fs = FileSystem.SYSTEM
-        val marker = dir / "inotify-probe-marker.txt"
+        val marker = dir / "rule-watcher-marker.txt"
         fs.write(marker) { writeUtf8("x") }
-        val n = readOnce(fd)
+        val n = readRulesWatch(fd)
         fs.delete(marker)
         assertTrue(n > 0, "expected inotify read() to return event bytes, got $n")
     }

@@ -8,11 +8,11 @@ import io.ktor.server.routing.*
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
-fun Route.interceptRoute(rules: List<Rule>, resolver: ResponseResolver) {
+fun Route.interceptRoute(currentRules: () -> List<Rule>, resolver: ResponseResolver) {
     post("/intercept") {
         val body = call.receiveText()
         val envelope = RequestEnvelope.fromJson(body)
-        val rule = matchRule(envelope, rules)
+        val rule = matchRule(envelope, currentRules())
 
         if (rule == null) {
             call.respondText(ResponseEnvelope.Passthrough().toJson(), ContentType.Application.Json)

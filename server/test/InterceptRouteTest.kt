@@ -26,7 +26,7 @@ class InterceptRouteTest {
     ).rules
 
     private fun testApp(block: suspend (io.ktor.client.HttpClient) -> Unit) = testApplication {
-        application { routing { interceptRoute(rules, resolver) } }
+        application { routing { interceptRoute({ rules }, resolver) } }
         block(createClient { })
     }
 
@@ -62,7 +62,7 @@ class InterceptRouteTest {
                 response: { file: responses/does-not-exist.json, status: 200 }
             """.trimIndent()
         ).rules
-        application { routing { interceptRoute(brokenRules, resolver) } }
+        application { routing { interceptRoute({ brokenRules }, resolver) } }
         val client = createClient { }
         val response = client.post("/intercept") {
             contentType(ContentType.Application.Json)
