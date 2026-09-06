@@ -1,117 +1,175 @@
 # GhostBe
 
-GhostBe lets you control what HTTP response an Android app sees for any
-given request — without touching the app's real backend or installing any
-certificates on the device. Instead of intercepting traffic at the network
-level, an OkHttp interceptor in the app relays each request to a small local
-server, which either returns a mocked response (from a static file or a
-script) or tells the app to call the real endpoint.
+GhostBe lets you control what response your Android app sees for any given
+HTTP request — so you can test how your app behaves against a 500 error, an
+empty list, a slow network, or a payload your real backend doesn't produce
+yet — without touching your backend and without installing any certificate
+on the device.
 
-Built with the [Kotlin Toolchain](https://kotlin-toolchain.org/dev/) — no
-Gradle files to author directly, just `module.yaml`/`project.yaml`.
-
-## How it works
+It works at the app level, not the network level: a small OkHttp
+interceptor in your app asks a local server, `ghost-be`, what to do with
+each request. If you've configured `ghost-be` to intercept it, your app gets
+the response you configured back. Otherwise, your app just calls the real
+endpoint like normal.
 
 ```
-App code
+Your app
   -> OkHttp client (GhostBeInterceptor installed)
-  -> POST /intercept on ghost-be (plain HTTP, localhost)
-       - rule matches   -> ghost-be returns a mocked response
-       - no rule matches -> ghost-be tells the client to pass through
-  -> mocked response returned to the app, OR the real endpoint is called
+  -> asks ghost-be, running locally, what to do with this request
+       - a rule matches    -> ghost-be sends back the response you configured
+       - no rule matches   -> ghost-be says "pass this through"
+  -> your app gets the configured response, or calls the real endpoint
 ```
 
-Full design rationale and the wire protocol are in
-[`docs/superpowers/specs/2026-09-06-okhttp-interceptor-design.md`](docs/superpowers/specs/2026-09-06-okhttp-interceptor-design.md).
+## Why
 
-## Modules
+- **No certificates.** Talks to `ghost-be` over plain HTTP on localhost —
+  nothing to install or trust on the device.
+- **No backend changes.** Mock a response your real API can't produce yet,
+  or reproduce a bug that only happens on a specific error response.
+- **Plain text config.** Rules live in YAML files and point at either a
+  static JSON file or a script — no code changes needed to add a new mock.
+- **Safe to leave wired in.** If `ghost-be` isn't running, your app just
+  talks to the real backend — nothing breaks.
 
-| Module | Type | Platform | What it is |
-|---|---|---|---|
-| [`client/`](client) | `kmp/lib` | Android | `GhostBeInterceptor` — the OkHttp interceptor apps depend on |
-| [`server/`](server) | `linux/app` | Kotlin/Native (`linuxX64`) | `ghost-be` — the CLI server that matches requests to rules and returns mock/passthrough responses |
-| [`demo-app/`](demo-app) | `android/app` | Android | Minimal Compose app exercising `client/` against a real device/emulator, for manual testing |
-| [`demo-backend/`](demo-backend) | — | Node.js | Single-file "real backend" the demo app calls when ghost-be passes a request through |
+## Using it in your app
 
-## Prerequisites
+Add the interceptor to whichever `OkHttpClient` your app uses — typically
+only in a debug or test build variant, since it adds a network hop to every
+request:
 
-- A JDK (Kotlin Toolchain bootstraps its own compiler, but needs a JDK on `PATH`)
-- Android SDK, with `ANDROID_HOME` set (needed for `client`/`demo-app`, not for `server`)
-- Node.js (only for running `demo-backend`)
-- Linux, for building/running `server` (`linuxX64` is the only target for v1)
+```kotlin
+val client = OkHttpClient.Builder()
+    .addInterceptor(GhostBeInterceptor(baseUrl = "http://127.0.0.1:8787"))
+    .build()
+```
 
-The `kotlin` (Linux/macOS) and `kotlin.bat` (Windows) scripts in the repo
-root are self-bootstrapping wrappers — they download the pinned Kotlin
-Toolchain version on first use.
+That's it on the app side. Everything else is configuring and running
+`ghost-be`.
 
-## Building and testing
+## Running ghost-be
+
+`ghost-be` is a small command-line server you run on your machine (or a CI
+runner) alongside the app you're testing:
+
+```bash
+ghost-be --port 8787 --rules ./rules
+```
+
+Both flags are optional (`8787` and `./rules` are the defaults).
+
+### Writing rules
+
+Rules live in YAML files under your rules directory. Each rule says which
+requests it matches, and what to send back:
+
+```yaml
+# rules/users.yaml
+rules:
+  - name: user-not-found
+    match:
+      method: GET
+      path: /v1/users/42
+    response:
+      file: responses/user-42-404.json
+      status: 404
+      headers: { Content-Type: application/json }
+```
+
+```json
+// rules/responses/user-42-404.json
+{ "error": "not found" }
+```
+
+Requests that don't match any rule are passed straight through to your real
+backend — you only need a rule for the cases you actually want to mock.
+
+`match` can also filter on specific query params or headers, and `path` can
+be a pattern like `/v1/users/{id}` for matching a family of URLs. See the
+[design spec](docs/superpowers/specs/2026-09-06-okhttp-interceptor-design.md#6-rule-configuration)
+for the full format.
+
+### Dynamic responses with a script
+
+For responses that depend on the request (rather than always returning the
+same file), point a rule at a script instead of a file:
+
+```yaml
+  - name: dynamic-user
+    match:
+      method: GET
+      pathPattern: "/v1/users/{id}"
+    response:
+      script: scripts/dynamic_user.py
+      status: 200
+```
+
+`ghost-be` runs the script (`python3` for `.py`, `node` for `.js`), passing
+it the request as JSON on stdin, and expects a JSON response
+(`{"status": ..., "headers": {...}, "body": "<base64>"}`) back on stdout.
+
+## Project status
+
+This is early — there's no published library or packaged binary yet, so for
+now both pieces need to be built from source. See below.
+
+## Building from source
+
+This repo is built with the [Kotlin Toolchain](https://kotlin-toolchain.org/dev/)
+(`module.yaml`/`project.yaml`, no Gradle files to author directly).
+
+| Module | What it is |
+|---|---|
+| [`client/`](client) | The `GhostBeInterceptor` library (Android) |
+| [`server/`](server) | `ghost-be` itself (Kotlin/Native, Linux) |
+| [`demo-app/`](demo-app) | A minimal Compose app for manually exercising `client/` |
+| [`demo-backend/`](demo-backend) | A tiny Node "real backend" for the demo app to fall through to |
+
+**Prerequisites:** a JDK, the Android SDK (`ANDROID_HOME` set) for
+`client`/`demo-app`, Node.js for `demo-backend`, and Linux for building
+`server`. The `kotlin`/`kotlin.bat` scripts in the repo root bootstrap the
+toolchain itself on first use — nothing else to install.
 
 ```bash
 export ANDROID_HOME=/path/to/Android/Sdk
 
 ./kotlin build              # build every module
-./kotlin build -m server    # build just one module
-./kotlin test               # run every module's tests
-./kotlin test -m client     # run just one module's tests
+./kotlin test                # run every module's tests
+./kotlin build -m server     # build/test just one module
+./kotlin run -m server -- --rules ./rules --port 8787
 ```
 
-## Running the demo end-to-end
+### Trying the demo end-to-end
 
-**1. Start demo-backend** (the "real" endpoint):
 ```bash
+# 1. Start the "real" backend
 node demo-backend/server.js
-```
 
-**2. Set up a rules directory for ghost-be.** Rules are plain YAML files
-matching requests (method/path/query/headers) to a static-file or script
-response — see the spec's §6 for the full format. For a quick manual test:
-```bash
-mkdir -p demo-rules/responses
-cat > demo-rules/basic.yaml <<'EOF'
-rules:
-  - name: mock-user-42
-    match:
-      method: GET
-      path: /v1/users/42
-    response:
-      file: responses/user-42.json
-      status: 200
-      headers: { Content-Type: application/json }
-EOF
-cat > demo-rules/responses/user-42.json <<'EOF'
-{"id": 42, "name": "Ada Lovelace (mocked by ghost-be)"}
-EOF
-```
-
-**3. Start ghost-be:**
-```bash
+# 2. Start ghost-be with a rules dir of your own (see "Writing rules" above)
 ./kotlin run -m server -- --rules ./demo-rules --port 8787
-```
-(`--port` and `--rules` are both optional; they default to `8787` and
-`./rules`.)
 
-**4. Install and launch demo-app on a connected device/emulator:**
-```bash
+# 3. Install and launch demo-app on a connected device/emulator
 export ANDROID_SERIAL=emulator-5554   # if more than one device is attached
 ./kotlin run -m demo-app
 ```
 
-**5. On an emulator, tunnel its localhost to the host:**
+On an emulator, its usual `10.0.2.2` host-loopback alias should reach
+`demo-backend`/`ghost-be` with no setup. If it times out on TCP connects
+(some host firewalls block it even though ping still works), fall back to
+tunneling through adb instead:
+
 ```bash
 adb reverse tcp:3000 tcp:3000
 adb reverse tcp:8787 tcp:8787
 ```
-The emulator's usual `10.0.2.2` host-loopback alias *should* work with no
-setup at all — but if it times out on TCP connects (some host firewall
-configurations block it even though ICMP/ping still succeeds), `adb
-reverse` is the reliable fallback: demo-app is wired to `127.0.0.1`, which
-after `adb reverse` resolves to the host machine's `127.0.0.1`. These
-mappings don't survive an emulator restart, so re-run them after a cold
+
+(demo-app is wired to `127.0.0.1`, which these mappings redirect to the
+host.) These don't survive an emulator restart, so re-run them after a cold
 boot.
 
-**Try it:** tap "Fetch User" with ghost-be running — you should see the
-mocked Ada Lovelace response. Stop ghost-be and tap again — the interceptor
-silently falls through to demo-backend's real response instead.
+Tap "Fetch User" with ghost-be running to see a mocked response; stop
+ghost-be and tap again to see the interceptor fall through to the real
+demo-backend response instead.
 
 ## Design docs
 
