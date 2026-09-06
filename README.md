@@ -34,6 +34,26 @@ Your app
 
 ## Using it in your app
 
+Add the JitPack repository, then the dependency (debug/test variants only —
+see below):
+
+```kotlin
+// settings.gradle.kts
+dependencyResolutionManagement {
+    repositories {
+        maven("https://jitpack.io")
+    }
+}
+
+// app build.gradle.kts
+dependencies {
+    debugImplementation("com.github.<owner>:ghost-be:<tag>")
+}
+```
+
+(Replace `<owner>` with this repo's GitHub owner and `<tag>` with a released
+version tag; see [Releases](../../releases) for available tags.)
+
 Add the interceptor to whichever `OkHttpClient` your app uses — typically
 only in a debug or test build variant, since it adds a network hop to every
 request:
@@ -116,8 +136,12 @@ it the request as JSON on stdin, and expects a JSON response
 
 ## Project status
 
-This is early — there's no published library or packaged binary yet, so for
-now both pieces need to be built from source. See below.
+Tagged releases (`v*`) publish the `client` library to
+[JitPack](https://jitpack.io/#/) (see "Using it in your app" above) and
+attach a prebuilt `ghost-be` Linux binary to the corresponding
+[GitHub Release](../../releases) — no build-from-source needed for either.
+If you're working from an untagged commit, or want to build either piece
+yourself, see below.
 
 ## Building from source
 

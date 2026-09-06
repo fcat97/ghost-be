@@ -1,0 +1,41 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  trigger-jitpack:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Warm the JitPack build for this tag
+        run: |
+          owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
+          repo=$(echo "${GITHUB_REPOSITORY#*/}" | tr '[:upper:]' '[:lower:]')
+          version="${{ github.ref_name }}"
+          echo "Requesting JitPack build for com.github.$owner:$repo:$version"
+          curl -fsS "https://jitpack.io/api/builds/com.github.$owner/$repo/$version" || true
+
+  build-ghost-be-binary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run server tests
+        run: ./kotlin test -m server
+
+      - name: Build ghost-be release binary
+        run: ./kotlin build -m server -v release
+
+      - name: Stage release binary
+        run: cp build/tasks/_server_linkLinuxX64Release/server.kexe ghost-be-linux-x64
+
+      - name: Upload release binary
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ghost-be-linux-x64
