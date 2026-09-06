@@ -21,13 +21,25 @@ if [ -z "$ANDROID_HOME" ]; then
   exit 0
 fi
 
-tmp_dir=$(mktemp -d)
-curl -sSL "$CMDLINE_TOOLS_URL" -o "$tmp_dir/cmdline-tools.zip"
-unzip -q "$tmp_dir/cmdline-tools.zip" -d "$tmp_dir"
+SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
 
-mkdir -p "$ANDROID_HOME/cmdline-tools/latest"
-mv "$tmp_dir/cmdline-tools/"* "$ANDROID_HOME/cmdline-tools/latest/"
+if [ ! -x "$SDKMANAGER" ]; then
+  tmp_dir=$(mktemp -d)
+  curl -sSL "$CMDLINE_TOOLS_URL" -o "$tmp_dir/cmdline-tools.zip"
+  unzip -q "$tmp_dir/cmdline-tools.zip" -d "$tmp_dir"
 
-yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses
+  mkdir -p "$ANDROID_HOME/cmdline-tools/latest"
+  mv "$tmp_dir/cmdline-tools/"* "$ANDROID_HOME/cmdline-tools/latest/"
+  rm -rf "$tmp_dir"
+fi
 
-rm -rf "$tmp_dir"
+# Force a refresh of the remote package/license index before reviewing
+# licenses -- otherwise sdkmanager only knows about whatever packages
+# were baked into the cmdline-tools zip at the time it was built, and
+# won't prompt for (or accept) a license introduced since then. This
+# also picks up licenses for any packages installed under $ANDROID_HOME
+# since the last time this ran (e.g. by an earlier, failed build
+# attempt), since sdkmanager reviews the whole SDK root, not just what
+# it installed itself.
+"$SDKMANAGER" --list > /dev/null
+yes | "$SDKMANAGER" --licenses
