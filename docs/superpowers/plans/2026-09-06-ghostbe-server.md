@@ -584,7 +584,7 @@ import kotlin.test.assertIs
 import okio.Path.Companion.toPath
 
 class ResponseResolverTest {
-    private val rulesDir = "server/test/fixtures".toPath()
+    private val rulesDir = "test/fixtures".toPath()
     private val resolver = ResponseResolver(rulesDir)
     private val envelope = RequestEnvelope("GET", "https://api.example.com/v1/users/42", emptyMap(), null)
 
@@ -996,7 +996,7 @@ import kotlin.test.assertTrue
 import okio.Path.Companion.toPath
 
 class InterceptRouteTest {
-    private val rulesDir = "server/test/fixtures".toPath()
+    private val rulesDir = "test/fixtures".toPath()
     private val resolver = ResponseResolver(rulesDir)
     private val rules = loadRuleFile(
         """
