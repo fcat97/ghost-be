@@ -974,6 +974,7 @@ git commit -m "feat: add script subprocess response resolution"
 **Files:**
 - Create: `server/src/InterceptRoute.kt`
 - Test: `server/test/InterceptRouteTest.kt`
+- Modify: `server/module.yaml` (add `test-dependencies: [$ktor.server.testHost]` — needed for `testApplication`/`createClient`, not pulled in by Task 1's dependencies)
 
 **Interfaces:**
 - Consumes: `RequestEnvelope`/`ResponseEnvelope` (Task 2), `Rule` (Task 3), `matchRule` (Task 4), `ResponseResolver`/`ResolvedResponse` (Tasks 5–6).
@@ -992,6 +993,8 @@ import io.ktor.server.routing.*
 import io.ktor.server.testing.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.io.encoding.Base64
+import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.assertTrue
 import okio.Path.Companion.toPath
 
@@ -1033,8 +1036,11 @@ class InterceptRouteTest {
         assertEquals("""{"intercept":false}""", response.bodyAsText())
     }
 
+    // Uses testApplication directly (not the testApp helper above) because this test
+    // needs its own rule set instead of the shared `rules`.
+    @OptIn(ExperimentalEncodingApi::class)
     @Test
-    fun `returns a 500 diagnostic when a matched rule fails to resolve`() = testApp { client ->
+    fun `returns a 500 diagnostic when a matched rule fails to resolve`() = testApplication {
         val brokenRules = loadRuleFile(
             """
             rules:
@@ -1043,20 +1049,21 @@ class InterceptRouteTest {
                 response: { file: responses/does-not-exist.json, status: 200 }
             """.trimIndent()
         ).rules
-        // Re-register with the broken rule set for this one test.
-        testApplication {
-            application { routing { interceptRoute(brokenRules, resolver) } }
-            val client = createClient { }
-            val response = client.post("/intercept") {
-                contentType(ContentType.Application.Json)
-                setBody("""{"method":"GET","url":"https://api.example.com/v1/broken","headers":{},"body":null}""")
-            }
-            assertEquals(HttpStatusCode.OK, response.status)
-            val text = response.bodyAsText()
-            assertTrue(text.contains("\"status\":500"))
-            assertTrue(text.contains("broken"))
+        application { routing { interceptRoute(brokenRules, resolver) } }
+        val client = createClient { }
+        val response = client.post("/intercept") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"method":"GET","url":"https://api.example.com/v1/broken","headers":{},"body":null}""")
         }
-    }
+        assertEquals(HttpStatusCode.OK, response.status)
+        val text = response.bodyAsText()
+        assertTrue(text.contains("\"status\":500"))
+        // The diagnostic message (including the rule name "broken") is inside the
+        // base64-encoded `body` field, not visible as plain text in the envelope --
+        // decode it before asserting on its content.
+        val bodyBase64 = Regex(""""body":"([^"]+)"""").find(text)!!.groupValues[1]
+        val decodedBody = Base64.decode(bodyBase64).decodeToString()
+        assertTrue(decodedBody.contains("broken"))
 }
 ```
 

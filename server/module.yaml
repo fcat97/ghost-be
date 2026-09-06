@@ -7,6 +7,9 @@ dependencies:
   - $ktor.server.cio
   - com.charleskorn.kaml:kaml:0.61.0
 
+test-dependencies:
+  - $ktor.server.testHost
+
 settings:
   ktor: enabled
   kotlin:
