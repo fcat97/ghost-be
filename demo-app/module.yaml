@@ -1,6 +1,7 @@
 product: android/app
 
 dependencies:
+  - //client
   - $compose.runtime
   - $compose.foundation
   - $compose.material3
