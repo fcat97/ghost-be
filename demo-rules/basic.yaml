@@ -1,0 +1,9 @@
+rules:
+  - name: mock-user-42
+    match:
+      method: GET
+      path: /v1/users/42
+    response:
+      file: responses/user-42.json
+      status: 200
+      headers: { Content-Type: application/json }
