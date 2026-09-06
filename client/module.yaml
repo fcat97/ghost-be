@@ -8,8 +8,17 @@ dependencies:
 test-dependencies:
   - com.squareup.okhttp3:mockwebserver3:5.0.0-alpha.14
 
+repositories:
+  - url: mavenLocal
+    publish: true
+
 settings:
   android:
     namespace: dev.yellobytes.ghostbe.client
   kotlin:
     serialization: json
+  publishing:
+    enabled: true
+    group: dev.yellobytes.ghostbe
+    artifactId: client
+    version: 0.1.0
