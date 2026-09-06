@@ -35,4 +35,30 @@ class ResponseResolverTest {
         val failure = assertIs<ResolvedResponse.Failure>(result)
         assertEquals("missing-file", failure.ruleName)
     }
+
+    @Test
+    fun `resolves a script response using an injected interpreter for testing`() {
+        val resolver = ResponseResolver(rulesDir, interpreterFor = { ext -> if (ext == "sh") "sh" else defaultInterpreterFor(ext) })
+        val rule = Rule(
+            name = "dynamic-user",
+            match = MatchSpec("GET", pathPattern = "/v1/users/{id}"),
+            response = ResponseSpec(script = "scripts/echo_user.sh", status = 200)
+        )
+        val result = resolver.resolve(rule, envelope)
+        val success = assertIs<ResolvedResponse.Success>(result)
+        assertEquals(201, success.status)
+        assertEquals("""{"ok":true}""", success.bodyBytes.decodeToString())
+    }
+
+    @Test
+    fun `returns a failure when the script's extension has no configured interpreter`() {
+        val rule = Rule(
+            name = "unrecognized-ext",
+            match = MatchSpec("GET", path = "/v1/x"),
+            response = ResponseSpec(script = "scripts/does-not-matter.rb", status = 200)
+        )
+        val result = resolver.resolve(rule, envelope)
+        val failure = assertIs<ResolvedResponse.Failure>(result)
+        assertEquals("unrecognized-ext", failure.ruleName)
+    }
 }
