@@ -108,6 +108,38 @@ why `GhostBe.session(...)` works by registering a custom `URLProtocol`
 into the session's configuration instead. No `.aar`-equivalent download
 step is needed; Xcode/SPM builds the package from source.
 
+### Flutter
+
+Add this repo as a git dependency, pinned to the same tag, in
+`pubspec.yaml`:
+
+```yaml
+dependencies:
+  ghost_be:
+    git:
+      url: https://github.com/$owner/$repo
+      path: flutter/ghost_be
+      ref: $tag
+```
+
+Find where the target app builds its `Dio` instance (search for `Dio(`)
+and add the interceptor, gated to debug builds:
+
+```dart
+import 'package:ghost_be/ghost_be.dart';
+
+final dio = Dio();
+if (kDebugMode) {
+  dio.interceptors.add(GhostBeInterceptor(baseUrl: 'http://127.0.0.1:8787'));
+}
+```
+
+Unlike Alamofire's `RequestInterceptor`, dio's `Interceptor.onRequest` can
+fully substitute a fake response (`handler.resolve(...)`), so this is a
+plain dio interceptor with no low-level workaround needed. No download
+step is needed; `dart pub get`/Flutter's build builds the package from
+source.
+
 On a physical device or emulator, make sure port 8787 actually reaches your
 machine — see this repo's README section "Trying the demo end-to-end" for
 the `10.0.2.2` vs `adb reverse` guidance.

@@ -94,6 +94,32 @@ fake response, only modify requests or retry — see the
 for why), so `GhostBe.session(...)` works instead by registering a custom
 `URLProtocol` into the session's configuration.
 
+### Flutter
+
+Add this repo as a git dependency in `pubspec.yaml`:
+
+```yaml
+dependencies:
+  ghost_be:
+    git:
+      url: https://github.com/fcat97/ghost-be
+      path: flutter/ghost_be
+```
+
+Add the interceptor to whichever `Dio` instance your app uses:
+
+```dart
+import 'package:dio/dio.dart';
+import 'package:ghost_be/ghost_be.dart';
+
+final dio = Dio()..interceptors.add(GhostBeInterceptor(baseUrl: 'http://127.0.0.1:8787'));
+```
+
+Unlike Alamofire's `RequestInterceptor`, dio's `Interceptor.onRequest` can
+fully substitute a fake response (`handler.resolve(...)`), so no low-level
+workaround is needed here — it's a plain dio interceptor, same shape as
+the Android client.
+
 That's it on the app side. Everything else is configuring and running
 `ghost-be`.
 
@@ -178,25 +204,29 @@ Tagged releases (`v*`) attach a prebuilt `ghost-be` binary for Linux
 Apple Silicon (`ghost-be-macos-arm64`), plus the `client` library's
 `.aar`, to the corresponding [GitHub Release](../../releases) (see
 "Using it in your app" above) — no build-from-source needed for any of
-them. The iOS package has no release artifact of its own — Swift Package
-Manager resolves it straight from this repo's `vX.Y.Z` git tags, and
-Xcode builds it from source. If you're working from an untagged commit,
-or want to build any piece yourself, see below.
+them. Neither the iOS nor the Flutter package has a release artifact of
+its own — Swift Package Manager and `pub` both resolve straight from this
+repo's `vX.Y.Z` git tags, and Xcode/`dart pub get` build from source. If
+you're working from an untagged commit, or want to build any piece
+yourself, see below.
 
 ## Building from source
 
 The Kotlin/Native and Android pieces are built with the
 [Kotlin Toolchain](https://kotlin-toolchain.org/dev/) (`module.yaml`/
-`project.yaml`, no Gradle files to author directly). The iOS client is a
-separate, plain Swift Package (`Package.swift` at the repo root, built
-with `swift build`/`swift test` — no Kotlin/KMP involvement, see the
-[design doc](docs/superpowers/specs/2026-09-07-ios-alamofire-interceptor-design.md#4-architecture-pure-native-swift-no-shared-kotlin-core)
+`project.yaml`, no Gradle files to author directly). The iOS and Flutter
+clients are separate, plain packages — a Swift Package (`Package.swift`
+at the repo root, built with `swift build`/`swift test`) and a Dart
+package (`flutter/ghost_be/pubspec.yaml`, built with `dart pub get`/
+`dart test`) respectively — neither involves Kotlin/KMP at all (see the
+[iOS design doc](docs/superpowers/specs/2026-09-07-ios-alamofire-interceptor-design.md#4-architecture-pure-native-swift-no-shared-kotlin-core)
 for why).
 
 | Module | What it is |
 |---|---|
 | [`client/`](client) | The `GhostBeInterceptor` library (Android) |
 | [`ios/GhostBe/`](ios/GhostBe) | The iOS client (Swift Package, Alamofire-based — see "Using it in your app" above) |
+| [`flutter/ghost_be/`](flutter/ghost_be) | The Flutter client (Dart package, dio-based — see "Using it in your app" above) |
 | [`server/`](server) | `ghost-be`'s shared implementation (Kotlin/Native library, `linuxX64` + `mingwX64` + `macosArm64`) |
 | [`server-linux/`](server-linux) | The Linux `ghost-be` executable — thin wrapper around `server/`'s entry point |
 | [`server-windows/`](server-windows) | The Windows `ghost-be` executable — same, cross-compiled for `mingwX64` |
