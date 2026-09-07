@@ -5,14 +5,14 @@ import kotlinx.cinterop.alloc
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import okio.Path
-import platform.posix.EVFILT_VNODE
-import platform.posix.EV_ADD
-import platform.posix.EV_CLEAR
-import platform.posix.NOTE_WRITE
+import platform.darwin.EVFILT_VNODE
+import platform.darwin.EV_ADD
+import platform.darwin.EV_CLEAR
+import platform.darwin.NOTE_WRITE
+import platform.darwin.kevent
+import platform.darwin.kqueue
 import platform.posix.O_EVTONLY
 import platform.posix.close
-import platform.posix.kevent
-import platform.posix.kqueue
 import platform.posix.open
 
 /**
@@ -35,7 +35,7 @@ actual fun watchRulesDirectory(rulesDir: Path, onChange: () -> Unit) {
             changeEvent.filter = EVFILT_VNODE.toShort()
             changeEvent.flags = (EV_ADD or EV_CLEAR).toUShort()
             changeEvent.fflags = NOTE_WRITE.toUInt()
-            changeEvent.data = 0
+            changeEvent.data = 0L
             changeEvent.udata = null
 
             while (true) {
