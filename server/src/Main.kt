@@ -6,6 +6,7 @@ import io.ktor.server.routing.routing
 import kotlin.concurrent.AtomicReference
 import kotlin.native.concurrent.TransferMode
 import kotlin.native.concurrent.Worker
+import okio.FileSystem
 import okio.Path
 import okio.Path.Companion.toPath
 import kotlin.system.exitProcess
@@ -25,6 +26,11 @@ private fun parseArgs(args: Array<String>): Pair<Int, String> {
 }
 
 private fun loadRulesOrExit(rulesDir: Path): List<Rule> {
+    if (!FileSystem.SYSTEM.exists(rulesDir)) {
+        println("ghost-be: rules directory not found: $rulesDir")
+        println("ghost-be: create it (with your rule .yaml files inside) or point --rules at an existing directory")
+        exitProcess(1)
+    }
     return try {
         loadRulesFromDirectory(rulesDir)
     } catch (e: IllegalArgumentException) {
