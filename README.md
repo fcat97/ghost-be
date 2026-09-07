@@ -184,7 +184,7 @@ export ANDROID_HOME=/path/to/Android/Sdk
 
 ### Trying the demo end-to-end
 
-`demo-app` depends on `dev.yellobytes.ghostbe:client:0.1.0` resolved from
+`demo-app` depends on `dev.yellowbytes.ghostbe:client:0.1.0` resolved from
 your local Maven repository (`~/.m2/repository`), the same way a real
 consumer would depend on it — not on `client/` as an in-repo project. So
 any time you change `client/` and want `demo-app` to pick it up, publish it

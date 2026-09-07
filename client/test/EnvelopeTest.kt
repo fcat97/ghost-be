@@ -1,4 +1,4 @@
-package dev.yellobytes.ghostbe.client
+package dev.yellowbytes.ghostbe.client
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

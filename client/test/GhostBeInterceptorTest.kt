@@ -1,6 +1,6 @@
 @file:OptIn(okhttp3.ExperimentalOkHttpApi::class)
 
-package dev.yellobytes.ghostbe.client
+package dev.yellowbytes.ghostbe.client
 
 import kotlin.test.Test
 import kotlin.test.AfterTest

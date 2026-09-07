@@ -55,13 +55,13 @@ test-dependencies:
 
 settings:
   android:
-    namespace: dev.yellobytes.ghostbe.client
+    namespace: dev.yellowbytes.ghostbe.client
 ```
 
 - [ ] **Step 3: Write a placeholder `client/src/GhostBeInterceptor.kt`**
 
 ```kotlin
-package dev.yellobytes.ghostbe.client
+package dev.yellowbytes.ghostbe.client
 
 class GhostBeInterceptor(private val baseUrl: String = "http://127.0.0.1:8787")
 ```
@@ -96,7 +96,7 @@ git commit -m "chore: scaffold ghost-be client module"
 - [ ] **Step 1: Write the failing test**
 
 ```kotlin
-package dev.yellobytes.ghostbe.client
+package dev.yellowbytes.ghostbe.client
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -142,7 +142,7 @@ Expected: FAIL — `RequestEnvelope`, `ResponseEnvelope` not defined.
 - [ ] **Step 3: Write the implementation**
 
 ```kotlin
-package dev.yellobytes.ghostbe.client
+package dev.yellowbytes.ghostbe.client
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -217,7 +217,7 @@ git commit -m "feat: add client-side envelope JSON models"
 - [ ] **Step 1: Write the implementation**
 
 ```kotlin
-package dev.yellobytes.ghostbe.client
+package dev.yellowbytes.ghostbe.client
 
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
@@ -325,7 +325,7 @@ git commit -m "feat: add GhostBeInterceptor relaying requests to ghost-be"
 - [ ] **Step 1: Write the failing tests**
 
 ```kotlin
-package dev.yellobytes.ghostbe.client
+package dev.yellowbytes.ghostbe.client
 
 import kotlin.test.Test
 import kotlin.test.AfterTest

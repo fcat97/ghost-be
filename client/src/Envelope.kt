@@ -1,4 +1,4 @@
-package dev.yellobytes.ghostbe.client
+package dev.yellowbytes.ghostbe.client
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString

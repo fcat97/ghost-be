@@ -1,4 +1,4 @@
-package dev.yellobytes.ghostbe.client
+package dev.yellowbytes.ghostbe.client
 
 import android.util.Log
 import kotlin.io.encoding.Base64

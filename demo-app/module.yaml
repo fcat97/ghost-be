@@ -4,7 +4,7 @@ repositories:
   - mavenLocal
 
 dependencies:
-  - dev.yellobytes.ghostbe:client:0.1.0
+  - dev.yellowbytes.ghostbe:client:0.1.0
   - $compose.runtime
   - $compose.foundation
   - $compose.material3
@@ -16,5 +16,5 @@ dependencies:
 settings:
   compose: enabled
   android:
-    namespace: dev.yellobytes.ghostbe.demoapp
-    applicationId: dev.yellobytes.ghostbe.demoapp
+    namespace: dev.yellowbytes.ghostbe.demoapp
+    applicationId: dev.yellowbytes.ghostbe.demoapp

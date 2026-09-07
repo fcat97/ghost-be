@@ -1,4 +1,4 @@
-package dev.yellobytes.ghostbe.demoapp
+package dev.yellowbytes.ghostbe.demoapp
 
 import android.os.Bundle
 import android.os.Handler
@@ -20,7 +20,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import dev.yellobytes.ghostbe.client.GhostBeInterceptor
+import dev.yellowbytes.ghostbe.client.GhostBeInterceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
