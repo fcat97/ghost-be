@@ -1,0 +1,12 @@
+# basic.yaml's exact match on /v1/users/42 wins for that one id (rules are
+# tried in file order, first match wins), so this pattern rule only fires
+# for other ids -- e.g. curl the /intercept endpoint with .../v1/users/7 to
+# see it run. See demo-rules/scripts/dynamic_user.py for the script itself.
+rules:
+  - name: dynamic-user
+    match:
+      method: GET
+      pathPattern: "/v1/users/{id}"
+    response:
+      script: scripts/dynamic_user.py
+      status: 200
