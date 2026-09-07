@@ -361,7 +361,7 @@ No `release.yml` changes are needed — this is a source-based SPM package, and 
 - Modify: `README.md`
 - Modify: `AGENTS.md`
 
-- [ ] **Step 1: Add an "iOS" subsection to README's "Using it in your app"**
+- [x] **Step 1: Add an "iOS" subsection to README's "Using it in your app"**
 
 Mirror the existing Android AAR instructions' structure, documenting:
 ```swift
@@ -375,11 +375,11 @@ let session = GhostBe.session() // defaults to http://127.0.0.1:8787
 session.request("https://api.example.com/v1/users/42").responseDecodable(of: User.self) { ... }
 ```
 
-- [ ] **Step 2: Add an iOS variant to AGENTS.md's step 2**
+- [x] **Step 2: Add an iOS variant to AGENTS.md's step 2**
 
 ("Integrate the client interceptor into the target app") mirroring the existing Android instructions, but for Xcode's "Add Package Dependency" + `GhostBe.session(...)` instead of the `.aar`/`libs/` flow.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add README.md AGENTS.md
