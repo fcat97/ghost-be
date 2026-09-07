@@ -1,5 +1,6 @@
 package dev.yellobytes.ghostbe.client
 
+import android.util.Log
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 import okhttp3.Interceptor
@@ -20,25 +21,40 @@ class GhostBeInterceptor(
     private val interceptUrl = baseUrl.trimEnd('/') + "/intercept"
     private val relayClient = OkHttpClient()
 
+    private companion object {
+        const val TAG = "GhostBe"
+    }
+
+    // android.util.Log is a stub under plain JVM unit tests (no Robolectric) and throws
+    // "not mocked" -- logging is best-effort and never worth failing a request over.
+    private fun logDebug(message: String) {
+        try {
+            Log.d(TAG, message)
+        } catch (_: Throwable) {
+        }
+    }
+
     override fun intercept(chain: Interceptor.Chain): Response {
         val originalRequest = chain.request()
         val envelope = buildEnvelope(originalRequest)
+        val requestLabel = "${originalRequest.method} ${originalRequest.url}"
+        val requestPayload = envelope.toJson()
+        logDebug("-> $requestLabel\nrequest payload: $requestPayload")
 
         val relayRequest = Request.Builder()
             .url(interceptUrl)
-            .post(envelope.toJson().toRequestBody("application/json".toMediaType()))
+            .post(requestPayload.toRequestBody("application/json".toMediaType()))
             .build()
 
-        val responseEnvelope: ResponseEnvelope = try {
-            relayClient.newCall(relayRequest).execute().use { relayResponse ->
-                ResponseEnvelope.fromJson(relayResponse.body!!.string())
-            }
+        val responsePayload = try {
+            relayClient.newCall(relayRequest).execute().use { relayResponse -> relayResponse.body!!.string() }
         } catch (e: IOException) {
-            // ghost-be is not reachable (not running, wrong port, etc). Treat this
-            // exactly like "no rule matched" and fall through to the real endpoint.
-            ResponseEnvelope.Passthrough()
+            logDebug("<- $requestLabel: ghost-be unreachable, passthrough")
+            return chain.proceed(originalRequest)
         }
+        val responseEnvelope = ResponseEnvelope.fromJson(responsePayload)
 
+        logDebug("<- $requestLabel\nresponse payload: $responsePayload")
         return when (responseEnvelope) {
             is ResponseEnvelope.Passthrough -> chain.proceed(originalRequest)
             is ResponseEnvelope.Mock -> buildResponse(originalRequest, responseEnvelope)
