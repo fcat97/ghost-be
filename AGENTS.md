@@ -30,26 +30,28 @@ restart it repeatedly while iterating.
 
 ## 2. Integrate the client interceptor into the target app
 
-Add the JitPack repository and the debug-only dependency to the target
-app's Gradle build (exact snippet in this repo's README under "Using it in
-your app"):
+Download the client `.aar` for the same tag you fetched the binary from,
+and drop it into the target app module's `libs/` directory:
 
-```kotlin
-// settings.gradle.kts
-dependencyResolutionManagement {
-    repositories {
-        maven("https://jitpack.io")
-    }
-}
-
-// app build.gradle.kts
-dependencies {
-    debugImplementation("com.github.fcat97:ghost-be:<tag>")
-}
+```bash
+mkdir -p app/libs
+curl -fsSL -o "app/libs/ghost-be-client-$tag.aar" \
+  "https://github.com/$owner/$repo/releases/download/$tag/ghost-be-client-$tag.aar"
 ```
 
-Use the same `<tag>` you fetched in step 1 so the client and server versions
-match.
+A raw local `.aar` doesn't carry its own dependency metadata, so declare
+its runtime dependencies alongside it in the target app's Gradle build
+(check `client/module.yaml` in this repo at the same tag if these versions
+have moved on):
+
+```kotlin
+// app build.gradle.kts
+dependencies {
+    debugImplementation(files("libs/ghost-be-client-$tag.aar"))
+    debugImplementation("com.squareup.okhttp3:okhttp:4.12.0")
+    debugImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+}
+```
 
 Find where the target app builds its `OkHttpClient` (search for
 `OkHttpClient.Builder()` or wherever its DI module provides one) and add

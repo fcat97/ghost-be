@@ -34,25 +34,24 @@ Your app
 
 ## Using it in your app
 
-Add the JitPack repository, then the dependency (debug/test variants only —
-see below):
+Download the client `.aar` from a tagged [Release](../../releases) (asset
+named `ghost-be-client-<tag>.aar`) and drop it into your app module's
+`libs/` directory. A raw local `.aar` doesn't carry its own dependency
+metadata, so declare its runtime dependencies alongside it — same variant
+as the AAR itself (debug/test only, see below):
 
 ```kotlin
-// settings.gradle.kts
-dependencyResolutionManagement {
-    repositories {
-        maven("https://jitpack.io")
-    }
-}
-
 // app build.gradle.kts
 dependencies {
-    debugImplementation("com.github.fcat97:ghost-be:<tag>")
+    debugImplementation(files("libs/ghost-be-client-<tag>.aar"))
+    debugImplementation("com.squareup.okhttp3:okhttp:4.12.0")
+    debugImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
 }
 ```
 
-(Replace `<tag>` with a released version tag; see
-[Releases](../../releases) for available tags.)
+(Replace `<tag>` with the release tag you downloaded; check the exact
+runtime dependency versions in that tag's `client/module.yaml` if you're
+not on the latest release.)
 
 Add the interceptor to whichever `OkHttpClient` your app uses — typically
 only in a debug or test build variant, since it adds a network hop to every
@@ -143,11 +142,11 @@ comments document the contract, and it's a real script you can run.
 
 ## Project status
 
-Tagged releases (`v*`) publish the `client` library to
-[JitPack](https://jitpack.io/#/) (see "Using it in your app" above) and
-attach a prebuilt `ghost-be` Linux binary to the corresponding
-[GitHub Release](../../releases) — no build-from-source needed for either.
-If you're working from an untagged commit, or want to build either piece
+Tagged releases (`v*`) attach both a prebuilt `ghost-be` Linux binary and
+the `client` library's `.aar` to the corresponding
+[GitHub Release](../../releases) (see "Using it in your app" above) — no
+build-from-source needed for either. If you're working from an untagged
+commit, or want to build either piece
 yourself, see below.
 
 ## Building from source

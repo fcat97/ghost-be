@@ -9,18 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  trigger-jitpack:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Warm the JitPack build for this tag
-        run: |
-          owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
-          repo=$(echo "${GITHUB_REPOSITORY#*/}" | tr '[:upper:]' '[:lower:]')
-          version="${{ github.ref_name }}"
-          echo "Requesting JitPack build for com.github.$owner:$repo:$version"
-          curl -fsS "https://jitpack.io/api/builds/com.github.$owner/$repo/$version" || true
-
-  build-ghost-be-binary:
+  build-release-artifacts:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -35,7 +24,15 @@ jobs:
       - name: Stage release binary
         run: cp build/tasks/_server_linkLinuxX64Release/server.kexe ghost-be-linux-x64
 
-      - name: Upload release binary
+      - name: Build client release AAR
+        run: ./kotlin build -m client -v release
+
+      - name: Stage client AAR
+        run: cp build/tasks/_client_aarAndroidRelease/client-jvm.aar "ghost-be-client-${GITHUB_REF_NAME}.aar"
+
+      - name: Upload release artifacts
         uses: softprops/action-gh-release@v2
         with:
-          files: ghost-be-linux-x64
+          files: |
+            ghost-be-linux-x64
+            ghost-be-client-*.aar
