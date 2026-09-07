@@ -11,21 +11,27 @@ format — this file only adds the step-by-step workflow.
 ## 1. Install the `ghost-be` binary from GitHub
 
 `ghost-be` releases are tagged `v*` on GitHub and each attaches a prebuilt
-Linux binary asset named `ghost-be-linux-x64`. Fetch the latest one:
+binary for Linux, Windows, and macOS (Apple Silicon). Fetch the one for
+your own OS:
 
 ```bash
 owner=fcat97
 repo=ghost-be
-
 tag=$(curl -fsS "https://api.github.com/repos/$owner/$repo/releases/latest" | jq -r .tag_name)
-curl -fsSL -o ghost-be \
-  "https://github.com/$owner/$repo/releases/download/$tag/ghost-be-linux-x64"
-chmod +x ghost-be
+
+case "$(uname -s)" in
+  Linux)  asset=ghost-be-linux-x64;       out=ghost-be ;;
+  Darwin) asset=ghost-be-macos-arm64;     out=ghost-be ;;
+  *)      asset=ghost-be-windows-x64.exe; out=ghost-be.exe ;;
+esac
+
+curl -fsSL -o "$out" "https://github.com/$owner/$repo/releases/download/$tag/$asset"
+chmod +x "$out"
 ```
 
-Verify it runs: `./ghost-be --help` or just start it (see step 3) and check
+Verify it runs: `./$out --help` or just start it (see step 3) and check
 for the "listening on" log line. Keep the binary somewhere durable in the
-target project (e.g. `tools/ghost-be`) rather than a temp dir, since you'll
+target project (e.g. `tools/$out`) rather than a temp dir, since you'll
 restart it repeatedly while iterating.
 
 ## 2. Integrate the client interceptor into the target app
@@ -110,7 +116,8 @@ endpoint speculatively.
 ## 4. Run the end-to-end test loop
 
 ```bash
-# terminal 1: start ghost-be pointed at the rules you just wrote
+# terminal 1: start ghost-be pointed at the rules you just wrote (the
+# binary from step 1 -- ghost-be or ghost-be.exe depending on your OS)
 ./ghost-be --port 8787 --rules ./ghost-be-rules
 
 # terminal 2: build and launch the target app on a connected device/emulator

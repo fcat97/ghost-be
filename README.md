@@ -167,16 +167,9 @@ This repo is built with the [Kotlin Toolchain](https://kotlin-toolchain.org/dev/
 
 **Prerequisites:** a JDK, the Android SDK (`ANDROID_HOME` set) for
 `client`/`demo-app`, and Node.js for `demo-backend`. `server-linux` and
-`server-windows` cross-compile from any host the Kotlin Toolchain runs
-on — no Docker, no Windows machine, and no separate MinGW install needed;
-the toolchain downloads whatever it needs (a Linux host builds the
-Windows binary too, for example). `server-macos` is different: Apple's
-SDK/linker isn't freely redistributable, so JetBrains can't bundle it
-the way it bundles the mingw-w64 toolchain — building `server-macos`,
-or even just compiling `server/`'s `macosArm64` source set, requires a
-real Mac (the Kotlin Toolchain silently skips any macOS compile task
-on a non-macOS host, rather than cross-compiling it). The release
-workflow builds and tests it on a `macos-latest` GitHub Actions runner.
+`server-windows` cross-compile from any host — no Docker or Windows
+machine needed. `server-macos` needs a real Mac (Apple's SDK can't be
+bundled the way mingw-w64 is); CI builds it on a `macos-latest` runner.
 The `kotlin`/`kotlin.bat` scripts in the repo root bootstrap the
 toolchain itself on first use — nothing else to install.
 
