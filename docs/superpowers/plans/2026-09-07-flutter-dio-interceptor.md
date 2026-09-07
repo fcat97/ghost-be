@@ -32,7 +32,7 @@
 **Interfaces:**
 - Produces: `RequestEnvelope(method, url, headers, body).toJson()`, `ResponseEnvelope.fromJson(Map<String, dynamic>)` returning either `MockResponseEnvelope(status, headers, body)` or `PassthroughResponseEnvelope()` — consumed by Task 2's `GhostBeInterceptor`.
 
-- [ ] **Step 1: Write `pubspec.yaml`**
+- [x] **Step 1: Write `pubspec.yaml`**
 
 ```yaml
 name: ghost_be
@@ -48,12 +48,12 @@ dev_dependencies:
   test: ^1.25.0
 ```
 
-- [ ] **Step 2: `cd flutter/ghost_be && dart pub get`**
+- [x] **Step 2: `cd flutter/ghost_be && dart pub get`**
 
 Run: `dart pub get`
 Expected: resolves `dio` and `test` successfully, creates `pubspec.lock`.
 
-- [ ] **Step 3: Write the failing envelope test**
+- [x] **Step 3: Write the failing envelope test**
 
 ```dart
 // flutter/ghost_be/test/envelope_test.dart
@@ -105,12 +105,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it fails**
+- [x] **Step 4: Run test to verify it fails**
 
 Run: `cd flutter/ghost_be && dart test test/envelope_test.dart`
 Expected: FAIL — `package:ghost_be/src/envelope.dart` doesn't exist yet.
 
-- [ ] **Step 5: Write `envelope.dart`**
+- [x] **Step 5: Write `envelope.dart`**
 
 ```dart
 // flutter/ghost_be/lib/src/envelope.dart
@@ -164,7 +164,7 @@ class MockResponseEnvelope implements ResponseEnvelope {
 class PassthroughResponseEnvelope implements ResponseEnvelope {}
 ```
 
-- [ ] **Step 6: Write `lib/ghost_be.dart`** (the package's public entry point — empty export for now, Task 2 adds the interceptor to it)
+- [x] **Step 6: Write `lib/ghost_be.dart`** (the package's public entry point — empty export for now, Task 2 adds the interceptor to it)
 
 ```dart
 // flutter/ghost_be/lib/ghost_be.dart
@@ -173,12 +173,12 @@ export 'src/ghost_be_interceptor.dart' show GhostBeInterceptor;
 
 This references `src/ghost_be_interceptor.dart`, which doesn't exist until Task 2 — that's fine, `dart test test/envelope_test.dart` (Step 7) only imports `src/envelope.dart` directly, not this file.
 
-- [ ] **Step 7: Run test to verify it passes**
+- [x] **Step 7: Run test to verify it passes**
 
 Run: `cd flutter/ghost_be && dart test test/envelope_test.dart`
 Expected: PASS — all four cases.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add flutter/ghost_be/pubspec.yaml flutter/ghost_be/pubspec.lock flutter/ghost_be/lib/src/envelope.dart flutter/ghost_be/test/envelope_test.dart
