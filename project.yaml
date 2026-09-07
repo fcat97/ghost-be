@@ -2,3 +2,5 @@ modules:
   - client
   - demo-app
   - server
+  - server-linux
+  - server-windows

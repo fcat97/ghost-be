@@ -1,0 +1,10 @@
+product:
+  type: windows/app
+  platforms: [ mingwX64 ]
+
+dependencies:
+  - //server
+
+settings:
+  native:
+    entryPoint: ghostbe.server.main

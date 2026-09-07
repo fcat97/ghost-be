@@ -1,0 +1,10 @@
+product:
+  type: linux/app
+  platforms: [ linuxX64 ]
+
+dependencies:
+  - //server
+
+settings:
+  native:
+    entryPoint: ghostbe.server.main

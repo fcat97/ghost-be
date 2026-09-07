@@ -15,14 +15,20 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Run server tests
+      - name: Run server library tests
         run: ./kotlin test -m server
 
-      - name: Build ghost-be release binary
-        run: ./kotlin build -m server -v release
+      - name: Build ghost-be Linux release binary
+        run: ./kotlin build -m server-linux -v release
 
-      - name: Stage release binary
-        run: cp build/tasks/_server_linkLinuxX64Release/server.kexe ghost-be-linux-x64
+      - name: Stage Linux release binary
+        run: cp build/tasks/_server-linux_linkLinuxX64Release/server-linux.kexe ghost-be-linux-x64
+
+      - name: Build ghost-be Windows release binary
+        run: ./kotlin build -m server-windows -v release
+
+      - name: Stage Windows release binary
+        run: cp build/tasks/_server-windows_linkMingwX64Release/server-windows.exe ghost-be-windows-x64.exe
 
       - name: Build client release AAR
         run: ./kotlin build -m client -v release
@@ -35,4 +41,5 @@ jobs:
         with:
           files: |
             ghost-be-linux-x64
+            ghost-be-windows-x64.exe
             ghost-be-client-*.aar

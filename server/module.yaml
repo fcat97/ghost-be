@@ -1,6 +1,6 @@
 product:
-  type: linux/app
-  platforms: [ linuxX64 ]
+  type: kmp/lib
+  platforms: [ linuxX64, mingwX64 ]
 
 dependencies:
   - $ktor.server.core
@@ -14,5 +14,3 @@ settings:
   ktor: enabled
   kotlin:
     serialization: json
-  native:
-    entryPoint: ghostbe.server.main

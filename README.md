@@ -142,12 +142,12 @@ comments document the contract, and it's a real script you can run.
 
 ## Project status
 
-Tagged releases (`v*`) attach both a prebuilt `ghost-be` Linux binary and
-the `client` library's `.aar` to the corresponding
+Tagged releases (`v*`) attach a prebuilt `ghost-be` binary for both
+Linux (`ghost-be-linux-x64`) and Windows (`ghost-be-windows-x64.exe`),
+plus the `client` library's `.aar`, to the corresponding
 [GitHub Release](../../releases) (see "Using it in your app" above) — no
-build-from-source needed for either. If you're working from an untagged
-commit, or want to build either piece
-yourself, see below.
+build-from-source needed for any of them. If you're working from an
+untagged commit, or want to build any piece yourself, see below.
 
 ## Building from source
 
@@ -157,22 +157,28 @@ This repo is built with the [Kotlin Toolchain](https://kotlin-toolchain.org/dev/
 | Module | What it is |
 |---|---|
 | [`client/`](client) | The `GhostBeInterceptor` library (Android) |
-| [`server/`](server) | `ghost-be` itself (Kotlin/Native, Linux) |
+| [`server/`](server) | `ghost-be`'s shared implementation (Kotlin/Native library, `linuxX64` + `mingwX64`) |
+| [`server-linux/`](server-linux) | The Linux `ghost-be` executable — thin wrapper around `server/`'s entry point |
+| [`server-windows/`](server-windows) | The Windows `ghost-be` executable — same, cross-compiled for `mingwX64` |
 | [`demo-app/`](demo-app) | A minimal Compose app for manually exercising `client/` (consumes it from local Maven, not as a project dependency — see below) |
 | [`demo-backend/`](demo-backend) | A tiny Node "real backend" for the demo app to fall through to |
 
 **Prerequisites:** a JDK, the Android SDK (`ANDROID_HOME` set) for
-`client`/`demo-app`, Node.js for `demo-backend`, and Linux for building
-`server`. The `kotlin`/`kotlin.bat` scripts in the repo root bootstrap the
-toolchain itself on first use — nothing else to install.
+`client`/`demo-app`, and Node.js for `demo-backend`. `server-linux` and
+`server-windows` cross-compile from any host the Kotlin Toolchain runs
+on — no Docker, no Windows machine, and no separate MinGW install needed;
+the toolchain downloads whatever it needs (a Linux host builds the
+Windows binary too, for example). The `kotlin`/`kotlin.bat` scripts in
+the repo root bootstrap the toolchain itself on first use — nothing else
+to install.
 
 ```bash
 export ANDROID_HOME=/path/to/Android/Sdk
 
-./kotlin build              # build every module
-./kotlin test                # run every module's tests
-./kotlin build -m server     # build/test just one module
-./kotlin run -m server -- --rules ./rules --port 8787
+./kotlin build                     # build every module
+./kotlin test                       # run every module's tests
+./kotlin build -m server-linux       # build/test just one module
+./kotlin run -m server-linux -- --rules ./rules --port 8787
 ```
 
 ### Trying the demo end-to-end
@@ -191,7 +197,7 @@ locally first:
 node demo-backend/server.js
 
 # 2. Start ghost-be with a rules dir of your own (see "Writing rules" above)
-./kotlin run -m server -- --rules ./demo-rules --port 8787
+./kotlin run -m server-linux -- --rules ./demo-rules --port 8787
 
 # 3. Install and launch demo-app on a connected device/emulator
 export ANDROID_SERIAL=emulator-5554   # if more than one device is attached
