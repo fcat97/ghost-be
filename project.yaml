@@ -1,7 +1,6 @@
 modules:
   - client
   - demo-app
-  - ios-spike
   - server
   - server-linux
   - server-macos
