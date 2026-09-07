@@ -1,0 +1,14 @@
+name: iOS Spike Check
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Build ios-spike (subclassing NSURLProtocol)
+        run: ./kotlin build -m ios-spike -v release
