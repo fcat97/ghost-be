@@ -158,7 +158,7 @@ This repo is built with the [Kotlin Toolchain](https://kotlin-toolchain.org/dev/
 |---|---|
 | [`client/`](client) | The `GhostBeInterceptor` library (Android) |
 | [`server/`](server) | `ghost-be` itself (Kotlin/Native, Linux) |
-| [`demo-app/`](demo-app) | A minimal Compose app for manually exercising `client/` |
+| [`demo-app/`](demo-app) | A minimal Compose app for manually exercising `client/` (consumes it from local Maven, not as a project dependency — see below) |
 | [`demo-backend/`](demo-backend) | A tiny Node "real backend" for the demo app to fall through to |
 
 **Prerequisites:** a JDK, the Android SDK (`ANDROID_HOME` set) for
@@ -177,7 +177,16 @@ export ANDROID_HOME=/path/to/Android/Sdk
 
 ### Trying the demo end-to-end
 
+`demo-app` depends on `dev.yellobytes.ghostbe:client:0.1.0` resolved from
+your local Maven repository (`~/.m2/repository`), the same way a real
+consumer would depend on it — not on `client/` as an in-repo project. So
+any time you change `client/` and want `demo-app` to pick it up, publish it
+locally first:
+
 ```bash
+# 0. Publish client to local Maven (repeat after any change to client/)
+./kotlin publish mavenLocal -m client
+
 # 1. Start the "real" backend
 node demo-backend/server.js
 

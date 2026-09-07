@@ -1,7 +1,10 @@
 product: android/app
 
+repositories:
+  - mavenLocal
+
 dependencies:
-  - //client
+  - dev.yellobytes.ghostbe:client:0.1.0
   - $compose.runtime
   - $compose.foundation
   - $compose.material3
