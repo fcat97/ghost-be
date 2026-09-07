@@ -43,3 +43,26 @@ jobs:
             ghost-be-linux-x64
             ghost-be-windows-x64.exe
             ghost-be-client-*.aar
+
+  build-macos-artifact:
+    runs-on: macos-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Run server library tests (includes macOS-specific Process/RuleWatcher tests)
+        run: ./kotlin test -m server
+
+      - name: Build ghost-be macOS release binary
+        run: ./kotlin build -m server-macos -v release
+
+      - name: Stage macOS release binary
+        run: |
+          binary=$(find build/tasks -ipath "*server-macos*" -type f -perm -u+x -print -quit)
+          test -n "$binary"
+          cp "$binary" ghost-be-macos-arm64
+
+      - name: Upload macOS release artifact
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ghost-be-macos-arm64

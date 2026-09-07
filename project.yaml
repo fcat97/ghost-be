@@ -3,4 +3,5 @@ modules:
   - demo-app
   - server
   - server-linux
+  - server-macos
   - server-windows

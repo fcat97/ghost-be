@@ -142,12 +142,13 @@ comments document the contract, and it's a real script you can run.
 
 ## Project status
 
-Tagged releases (`v*`) attach a prebuilt `ghost-be` binary for both
-Linux (`ghost-be-linux-x64`) and Windows (`ghost-be-windows-x64.exe`),
-plus the `client` library's `.aar`, to the corresponding
-[GitHub Release](../../releases) (see "Using it in your app" above) — no
-build-from-source needed for any of them. If you're working from an
-untagged commit, or want to build any piece yourself, see below.
+Tagged releases (`v*`) attach a prebuilt `ghost-be` binary for Linux
+(`ghost-be-linux-x64`), Windows (`ghost-be-windows-x64.exe`), and macOS
+Apple Silicon (`ghost-be-macos-arm64`), plus the `client` library's
+`.aar`, to the corresponding [GitHub Release](../../releases) (see
+"Using it in your app" above) — no build-from-source needed for any of
+them. If you're working from an untagged commit, or want to build any
+piece yourself, see below.
 
 ## Building from source
 
@@ -157,9 +158,10 @@ This repo is built with the [Kotlin Toolchain](https://kotlin-toolchain.org/dev/
 | Module | What it is |
 |---|---|
 | [`client/`](client) | The `GhostBeInterceptor` library (Android) |
-| [`server/`](server) | `ghost-be`'s shared implementation (Kotlin/Native library, `linuxX64` + `mingwX64`) |
+| [`server/`](server) | `ghost-be`'s shared implementation (Kotlin/Native library, `linuxX64` + `mingwX64` + `macosArm64`) |
 | [`server-linux/`](server-linux) | The Linux `ghost-be` executable — thin wrapper around `server/`'s entry point |
 | [`server-windows/`](server-windows) | The Windows `ghost-be` executable — same, cross-compiled for `mingwX64` |
+| [`server-macos/`](server-macos) | The macOS (Apple Silicon) `ghost-be` executable — same, for `macosArm64` |
 | [`demo-app/`](demo-app) | A minimal Compose app for manually exercising `client/` (consumes it from local Maven, not as a project dependency — see below) |
 | [`demo-backend/`](demo-backend) | A tiny Node "real backend" for the demo app to fall through to |
 
@@ -168,9 +170,15 @@ This repo is built with the [Kotlin Toolchain](https://kotlin-toolchain.org/dev/
 `server-windows` cross-compile from any host the Kotlin Toolchain runs
 on — no Docker, no Windows machine, and no separate MinGW install needed;
 the toolchain downloads whatever it needs (a Linux host builds the
-Windows binary too, for example). The `kotlin`/`kotlin.bat` scripts in
-the repo root bootstrap the toolchain itself on first use — nothing else
-to install.
+Windows binary too, for example). `server-macos` is different: Apple's
+SDK/linker isn't freely redistributable, so JetBrains can't bundle it
+the way it bundles the mingw-w64 toolchain — building `server-macos`,
+or even just compiling `server/`'s `macosArm64` source set, requires a
+real Mac (the Kotlin Toolchain silently skips any macOS compile task
+on a non-macOS host, rather than cross-compiling it). The release
+workflow builds and tests it on a `macos-latest` GitHub Actions runner.
+The `kotlin`/`kotlin.bat` scripts in the repo root bootstrap the
+toolchain itself on first use — nothing else to install.
 
 ```bash
 export ANDROID_HOME=/path/to/Android/Sdk

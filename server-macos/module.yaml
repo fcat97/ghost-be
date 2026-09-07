@@ -1,0 +1,10 @@
+product:
+  type: macos/app
+  platforms: [ macosArm64 ]
+
+dependencies:
+  - //server
+
+settings:
+  native:
+    entryPoint: ghostbe.server.main
