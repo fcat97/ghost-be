@@ -34,11 +34,11 @@ Your app
 
 ## Using it in your app
 
-Download the client `.aar` from a tagged [Release](../../releases) (asset
-named `ghost-be-client-<tag>.aar`) and drop it into your app module's
-`libs/` directory. A raw local `.aar` doesn't carry its own dependency
-metadata, so declare its runtime dependencies alongside it — same variant
-as the AAR itself (debug/test only, see below):
+Download the client `.aar` from the [latest Release](../../releases/latest)
+(asset named `ghost-be-client-<tag>.aar`) and drop it into your app
+module's `libs/` directory. A raw local `.aar` doesn't carry its own
+dependency metadata, so declare its runtime dependencies alongside it —
+same variant as the AAR itself (debug/test only, see below):
 
 ```kotlin
 // app build.gradle.kts
