@@ -374,7 +374,7 @@ git commit -m "feat: implement GhostBeInterceptor (dio), test mock/passthrough/u
 - Modify: `README.md`
 - Modify: `AGENTS.md`
 
-- [ ] **Step 1: Write `flutter-check.yml`**
+- [x] **Step 1: Write `flutter-check.yml`**
 
 ```yaml
 # .github/workflows/flutter-check.yml
@@ -400,7 +400,7 @@ jobs:
         working-directory: flutter/ghost_be
 ```
 
-- [ ] **Step 2: Commit, push, trigger, watch**
+- [x] **Step 2: Commit, push, trigger, watch**
 
 ```bash
 git add .github/workflows/flutter-check.yml
@@ -411,7 +411,7 @@ gh workflow run "Flutter Check" -R fcat97/ghost-be --ref master
 
 Then watch it with `gh run watch <id> --exit-status`. Since this was already verified locally in Tasks 1-2, this should pass on the first attempt — if it doesn't, the difference between the local environment and `ubuntu-latest` (Dart version, missing `dart-lang/setup-dart` pin, etc.) is itself worth understanding before moving on, not just re-triggering blindly.
 
-- [ ] **Step 3: Add a "Flutter" subsection to README's "Using it in your app"**
+- [x] **Step 3: Add a "Flutter" subsection to README's "Using it in your app"**
 
 Mirror the Android/iOS subsections' structure:
 
@@ -438,11 +438,11 @@ final dio = Dio()..interceptors.add(GhostBeInterceptor(baseUrl: 'http://127.0.0.
 \`\`\`
 ```
 
-- [ ] **Step 4: Add a Flutter variant to AGENTS.md's step 2**
+- [x] **Step 4: Add a Flutter variant to AGENTS.md's step 2**
 
 Mirroring the existing Android/iOS instructions there.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add README.md AGENTS.md
