@@ -1,0 +1,20 @@
+name: Flutter Check
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+      - name: Install dependencies
+        run: dart pub get
+        working-directory: flutter/ghost_be
+      - name: Analyze
+        run: dart analyze
+        working-directory: flutter/ghost_be
+      - name: Test
+        run: dart test
+        working-directory: flutter/ghost_be
