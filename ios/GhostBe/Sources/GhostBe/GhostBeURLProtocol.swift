@@ -1,7 +1,7 @@
 import Foundation
 
 final class GhostBeURLProtocol: URLProtocol {
-    private var task: URLSessionDataTask?
+    private var relayedTask: URLSessionDataTask?
     static var baseURL = "http://127.0.0.1:8787"
 
     override class func canInit(with request: URLRequest) -> Bool { true }
@@ -45,7 +45,7 @@ final class GhostBeURLProtocol: URLProtocol {
 
     private func performRealRequest(client: URLProtocolClient) {
         let realSession = URLSession(configuration: .default)
-        task = realSession.dataTask(with: request) { data, response, error in
+        relayedTask = realSession.dataTask(with: request) { data, response, error in
             if let error = error {
                 client.urlProtocol(self, didFailWithError: error)
                 return
@@ -58,10 +58,10 @@ final class GhostBeURLProtocol: URLProtocol {
             }
             client.urlProtocolDidFinishLoading(self)
         }
-        task?.resume()
+        relayedTask?.resume()
     }
 
     override func stopLoading() {
-        task?.cancel()
+        relayedTask?.cancel()
     }
 }
