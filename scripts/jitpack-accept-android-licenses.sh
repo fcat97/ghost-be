@@ -43,3 +43,20 @@ fi
 # it installed itself.
 "$SDKMANAGER" --list > /dev/null
 yes | "$SDKMANAGER" --licenses
+
+# The Kotlin Toolchain's own Android Gradle Plugin build downloads its OWN
+# cmdline-tools under $ANDROID_HOME/cmdline-tools/<its-version> (distinct
+# from the "latest" one we just planted above) and uses THAT binary's
+# bundled repository manifest to decide which licenses need accepting --
+# not ours. Different cmdline-tools versions can know about different
+# packages/licenses, so accepting everything our sdkmanager knows about
+# doesn't guarantee theirs agrees nothing is outstanding. Find every other
+# sdkmanager under $ANDROID_HOME and run --licenses with it too, so
+# whichever binary the real build ends up consulting has already accepted
+# whatever it thinks needs accepting.
+find "$ANDROID_HOME" -path "$SDKMANAGER" -prune -o -type f -name sdkmanager -print 2>/dev/null |
+while IFS= read -r other_sdkmanager; do
+  echo "Also accepting licenses via $other_sdkmanager" >&2
+  "$other_sdkmanager" --list > /dev/null
+  yes | "$other_sdkmanager" --licenses
+done
