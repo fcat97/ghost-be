@@ -33,7 +33,7 @@
 **Interfaces:**
 - Produces: `GhostBe.session(baseURL:) -> Session` (Task 2's tests call this), `.github/workflows/ios-check.yml` (Task 2 extends it with `swift test`).
 
-- [ ] **Step 1: Write `Package.swift`**
+- [x] **Step 1: Write `Package.swift`**
 
 ```swift
 // swift-tools-version:5.9
@@ -60,7 +60,7 @@ let package = Package(
 )
 ```
 
-- [ ] **Step 2: Write `Envelope.swift`** (verbatim from spec §4)
+- [x] **Step 2: Write `Envelope.swift`** (verbatim from spec §4)
 
 ```swift
 // ios/GhostBe/Sources/GhostBe/Envelope.swift
@@ -95,7 +95,7 @@ enum ResponseEnvelope: Decodable {
 }
 ```
 
-- [ ] **Step 3: Write `GhostBeURLProtocol.swift`** (verbatim from spec §4)
+- [x] **Step 3: Write `GhostBeURLProtocol.swift`** (verbatim from spec §4)
 
 ```swift
 // ios/GhostBe/Sources/GhostBe/GhostBeURLProtocol.swift
@@ -168,7 +168,7 @@ final class GhostBeURLProtocol: URLProtocol {
 }
 ```
 
-- [ ] **Step 4: Write `GhostBe.swift`** (verbatim from spec §4)
+- [x] **Step 4: Write `GhostBe.swift`** (verbatim from spec §4)
 
 ```swift
 // ios/GhostBe/Sources/GhostBe/GhostBe.swift
@@ -185,7 +185,7 @@ public enum GhostBe {
 }
 ```
 
-- [ ] **Step 5: Write `ios-check.yml`**
+- [x] **Step 5: Write `ios-check.yml`**
 
 ```yaml
 # .github/workflows/ios-check.yml
@@ -203,7 +203,7 @@ jobs:
         run: swift build --package-path .
 ```
 
-- [ ] **Step 6: Commit, push, trigger (`gh workflow run "iOS Check" --ref master`), watch, fix compile errors, repeat until green**
+- [x] **Step 6: Commit, push, trigger (`gh workflow run "iOS Check" --ref master`), watch, fix compile errors, repeat until green**
 
 Expect real first-attempt errors here — none of `GhostBeURLProtocol`'s `URLProtocolClient` callback usage, `HTTPURLResponse` construction, or Alamofire's `URLSessionConfiguration.af.default` extension have been compiled anywhere before. Fix whatever the actual `swift build` error says; do not guess more than twice at the same error before reading Apple's actual `URLProtocol`/`URLSessionConfiguration` API documentation directly rather than continuing to guess blind.
 
