@@ -12,14 +12,26 @@ import okio.Path.Companion.toPath
 import kotlin.system.exitProcess
 
 private const val BANNER = """
-   .-""-.
-  /      \      ghost-be
- |  o  o  |     mock HTTP responses for your Android app, no backend changes needed
-  \  __  /      https://github.com/fcat97/ghost-be
-   '.__.'
-  /|    |\
- ' |    | '
-   '----'
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%%%%%%%%%%%%         %%%%%%%%%%%%
+%%%%%%%%%%%            %%%%%%%%%%
+%%%%%%%%%%   ##   ##   #%%%%%%%%%
+%%%%%%%%%%   -  .  %   :####%%%%%
+%%%%%%%###     =+#      ######%%%
+%%%%#                       ###%%
+%%%%                         ##%%
+%%%###:                 ...######
+%%%#####%                ########
+%%######                 ########
+%%%###                     ######
+%%####..                  :%#####
+%%%##### ..         .    ########
+%%%%###########   ###############
+%%%%###########################%%
+
+ghost-be -- mock HTTP responses for your Android app, no backend changes needed
+https://github.com/fcat97/ghost-be
 """
 
 private const val USAGE = """Usage: ghost-be [options]
