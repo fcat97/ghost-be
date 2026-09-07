@@ -36,6 +36,8 @@ restart it repeatedly while iterating.
 
 ## 2. Integrate the client interceptor into the target app
 
+### Android
+
 Download the client `.aar` for the same tag you fetched the binary from,
 and drop it into the target app module's `libs/` directory:
 
@@ -76,6 +78,35 @@ logging interceptor), follow that existing pattern instead of introducing a
 new one. `debugImplementation` already keeps `GhostBeInterceptor` out of
 release builds, so the `BuildConfig.DEBUG` guard is only needed if the same
 source set is shared across build types.
+
+### iOS
+
+Add this repo as a Swift Package dependency, pinned to the same tag:
+
+```swift
+// Package.swift, or Xcode's Add Package Dependencies dialog
+.package(url: "https://github.com/$owner/$repo", exact: "$tag")
+```
+
+Find where the target app builds its Alamofire `Session` (search for
+`Session(` or `Session.default`) and replace it with `GhostBe.session(...)`,
+gated to debug builds the same way as Android:
+
+```swift
+import GhostBe
+
+#if DEBUG
+let session = GhostBe.session(baseURL: "http://127.0.0.1:8787")
+#else
+let session = Session.default
+#endif
+```
+
+Alamofire's own `RequestInterceptor` can't do what `ghost-be` needs (it
+can only modify requests or retry, never substitute a response) — this is
+why `GhostBe.session(...)` works by registering a custom `URLProtocol`
+into the session's configuration instead. No `.aar`-equivalent download
+step is needed; Xcode/SPM builds the package from source.
 
 On a physical device or emulator, make sure port 8787 actually reaches your
 machine — see this repo's README section "Trying the demo end-to-end" for

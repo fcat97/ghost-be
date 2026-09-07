@@ -34,6 +34,8 @@ Your app
 
 ## Using it in your app
 
+### Android
+
 Download the client `.aar` from the [latest Release](../../releases/latest)
 (asset named `ghost-be-client-<tag>.aar`) and drop it into your app
 module's `libs/` directory. A raw local `.aar` doesn't carry its own
@@ -62,6 +64,35 @@ val client = OkHttpClient.Builder()
     .addInterceptor(GhostBeInterceptor(baseUrl = "http://127.0.0.1:8787"))
     .build()
 ```
+
+### iOS
+
+Add this repo as a Swift Package dependency (Xcode: File → Add Package
+Dependencies…, or in `Package.swift`):
+
+```swift
+.package(url: "https://github.com/fcat97/ghost-be", from: "0.1.14")
+```
+
+Then use `GhostBe.session(...)` instead of building your own Alamofire
+`Session` — it's a normal `Session`, pre-configured to ask `ghost-be`
+about every request:
+
+```swift
+import GhostBe
+
+let session = GhostBe.session() // defaults to http://127.0.0.1:8787
+session.request("https://api.example.com/v1/users/42")
+    .responseDecodable(of: User.self) { response in
+        // ...
+    }
+```
+
+Alamofire's own `RequestInterceptor` can't do this (it can't substitute a
+fake response, only modify requests or retry — see the
+[design doc](docs/superpowers/specs/2026-09-07-ios-alamofire-interceptor-design.md#2-why-not-requestinterceptor)
+for why), so `GhostBe.session(...)` works instead by registering a custom
+`URLProtocol` into the session's configuration.
 
 That's it on the app side. Everything else is configuring and running
 `ghost-be`.
@@ -147,17 +178,25 @@ Tagged releases (`v*`) attach a prebuilt `ghost-be` binary for Linux
 Apple Silicon (`ghost-be-macos-arm64`), plus the `client` library's
 `.aar`, to the corresponding [GitHub Release](../../releases) (see
 "Using it in your app" above) — no build-from-source needed for any of
-them. If you're working from an untagged commit, or want to build any
-piece yourself, see below.
+them. The iOS package has no release artifact of its own — Swift Package
+Manager resolves it straight from this repo's `vX.Y.Z` git tags, and
+Xcode builds it from source. If you're working from an untagged commit,
+or want to build any piece yourself, see below.
 
 ## Building from source
 
-This repo is built with the [Kotlin Toolchain](https://kotlin-toolchain.org/dev/)
-(`module.yaml`/`project.yaml`, no Gradle files to author directly).
+The Kotlin/Native and Android pieces are built with the
+[Kotlin Toolchain](https://kotlin-toolchain.org/dev/) (`module.yaml`/
+`project.yaml`, no Gradle files to author directly). The iOS client is a
+separate, plain Swift Package (`Package.swift` at the repo root, built
+with `swift build`/`swift test` — no Kotlin/KMP involvement, see the
+[design doc](docs/superpowers/specs/2026-09-07-ios-alamofire-interceptor-design.md#4-architecture-pure-native-swift-no-shared-kotlin-core)
+for why).
 
 | Module | What it is |
 |---|---|
 | [`client/`](client) | The `GhostBeInterceptor` library (Android) |
+| [`ios/GhostBe/`](ios/GhostBe) | The iOS client (Swift Package, Alamofire-based — see "Using it in your app" above) |
 | [`server/`](server) | `ghost-be`'s shared implementation (Kotlin/Native library, `linuxX64` + `mingwX64` + `macosArm64`) |
 | [`server-linux/`](server-linux) | The Linux `ghost-be` executable — thin wrapper around `server/`'s entry point |
 | [`server-windows/`](server-windows) | The Windows `ghost-be` executable — same, cross-compiled for `mingwX64` |
