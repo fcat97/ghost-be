@@ -1,0 +1,12 @@
+name: iOS Check
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build the Swift package
+        run: swift build --package-path .
