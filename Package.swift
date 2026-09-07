@@ -17,6 +17,11 @@ let package = Package(
                 .product(name: "Alamofire", package: "Alamofire")
             ],
             path: "ios/GhostBe/Sources/GhostBe"
+        ),
+        .testTarget(
+            name: "GhostBeTests",
+            dependencies: ["GhostBe"],
+            path: "ios/GhostBe/Tests/GhostBeTests"
         )
     ]
 )

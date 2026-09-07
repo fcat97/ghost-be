@@ -10,3 +10,5 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build the Swift package
         run: swift build --package-path .
+      - name: Run Swift tests
+        run: swift test --package-path .
