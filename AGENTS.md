@@ -14,7 +14,7 @@ format — this file only adds the step-by-step workflow.
 Linux binary asset named `ghost-be-linux-x64`. Fetch the latest one:
 
 ```bash
-owner=<owner>   # this repo's GitHub owner
+owner=fcat97
 repo=ghost-be
 
 tag=$(curl -fsS "https://api.github.com/repos/$owner/$repo/releases/latest" | jq -r .tag_name)
@@ -44,7 +44,7 @@ dependencyResolutionManagement {
 
 // app build.gradle.kts
 dependencies {
-    debugImplementation("com.github.<owner>:ghost-be:<tag>")
+    debugImplementation("com.github.fcat97:ghost-be:<tag>")
 }
 ```
 

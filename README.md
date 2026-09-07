@@ -47,12 +47,12 @@ dependencyResolutionManagement {
 
 // app build.gradle.kts
 dependencies {
-    debugImplementation("com.github.<owner>:ghost-be:<tag>")
+    debugImplementation("com.github.fcat97:ghost-be:<tag>")
 }
 ```
 
-(Replace `<owner>` with this repo's GitHub owner and `<tag>` with a released
-version tag; see [Releases](../../releases) for available tags.)
+(Replace `<tag>` with a released version tag; see
+[Releases](../../releases) for available tags.)
 
 Add the interceptor to whichever `OkHttpClient` your app uses — typically
 only in a debug or test build variant, since it adds a network hop to every
