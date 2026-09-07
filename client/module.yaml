@@ -17,6 +17,8 @@ settings:
     namespace: dev.yellobytes.ghostbe.client
   kotlin:
     serialization: json
+  jvm:
+    release: 11
   publishing:
     enabled: true
     group: dev.yellobytes.ghostbe
