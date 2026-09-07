@@ -221,7 +221,7 @@ Expected end state: `iOS Check` run is green (build only — no tests yet, that'
 **Interfaces:**
 - Consumes: `GhostBe.session(baseURL:)` from Task 1.
 
-- [ ] **Step 1: Add the test target to `Package.swift`**
+- [x] **Step 1: Add the test target to `Package.swift`**
 
 ```swift
     targets: [
@@ -234,7 +234,7 @@ Expected end state: `iOS Check` run is green (build only — no tests yet, that'
     ]
 ```
 
-- [ ] **Step 2: Write the failing test**
+- [x] **Step 2: Write the failing test**
 
 Launches a real `ghost-be`-shaped stub via a `python3` subprocess (preinstalled on `macos-latest`) serving one canned `/intercept` response, then asserts `GhostBe.session(...)` returns that mocked response instead of hitting anything real:
 
@@ -331,19 +331,19 @@ final class GhostBeURLProtocolTests: XCTestCase {
 }
 ```
 
-- [ ] **Step 3: Extend `ios-check.yml`**
+- [x] **Step 3: Extend `ios-check.yml`**
 
 ```yaml
       - name: Run Swift tests
         run: swift test --package-path .
 ```
 
-- [ ] **Step 4: Trigger, watch, fix, repeat until green**
+- [x] **Step 4: Trigger, watch, fix, repeat until green**
 
 Run: `gh workflow run "iOS Check" -R fcat97/ghost-be --ref master` then `gh run watch <id> --exit-status`
 Expected end state: both `swift build` and `swift test` steps green, covering both `testReturnsTheMockedResponseInsteadOfCallingTheRealBackend` and `testFallsThroughToTheRealRequestWhenGhostBeSaysPassthrough` from Step 2's code.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add Package.swift ios/GhostBe/Tests .github/workflows/ios-check.yml
