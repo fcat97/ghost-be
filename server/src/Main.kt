@@ -11,18 +11,44 @@ import okio.Path
 import okio.Path.Companion.toPath
 import kotlin.system.exitProcess
 
-private fun parseArgs(args: Array<String>): Pair<Int, String> {
+private const val BANNER = """
+   .-""-.
+  /      \      ghost-be
+ |  o  o  |     mock HTTP responses for your Android app, no backend changes needed
+  \  __  /      https://github.com/fcat97/ghost-be
+   '.__.'
+  /|    |\
+ ' |    | '
+   '----'
+"""
+
+private const val USAGE = """Usage: ghost-be [options]
+
+Options:
+  --port <port>   Port to listen on (default: 8787)
+  --rules <dir>   Directory of rule .yaml files to watch (default: ./rules)
+  -h, --help      Show this help and exit
+
+Docs: https://github.com/fcat97/ghost-be#readme"""
+
+private sealed interface ParsedArgs {
+    data object Help : ParsedArgs
+    data class Run(val port: Int, val rulesDir: String) : ParsedArgs
+}
+
+private fun parseArgs(args: Array<String>): ParsedArgs {
     var port = 8787
     var rulesDir = "./rules"
     var i = 0
     while (i < args.size) {
         when (args[i]) {
+            "-h", "--help" -> return ParsedArgs.Help
             "--port" -> { port = args[i + 1].toInt(); i += 2 }
             "--rules" -> { rulesDir = args[i + 1]; i += 2 }
             else -> { i += 1 }
         }
     }
-    return port to rulesDir
+    return ParsedArgs.Run(port, rulesDir)
 }
 
 private fun loadRulesOrExit(rulesDir: Path): List<Rule> {
@@ -41,9 +67,15 @@ private fun loadRulesOrExit(rulesDir: Path): List<Rule> {
 }
 
 fun main(args: Array<String>) {
-    val (port, rulesDirArg) = parseArgs(args)
+    val parsed = parseArgs(args)
+    if (parsed is ParsedArgs.Help) {
+        println(USAGE)
+        return
+    }
+    val (port, rulesDirArg) = parsed as ParsedArgs.Run
     val rulesDir = rulesDirArg.toPath()
 
+    println(BANNER)
     val rulesRef = AtomicReference(loadRulesOrExit(rulesDir))
     println("ghost-be: loaded ${rulesRef.value.size} rule(s) from $rulesDir")
     println("ghost-be: listening on http://127.0.0.1:$port")
