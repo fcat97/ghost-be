@@ -131,8 +131,49 @@ same file), point a rule at a script instead of a file:
 ```
 
 `ghost-be` runs the script (`python3` for `.py`, `node` for `.js`), passing
-it the request as JSON on stdin, and expects a JSON response
-(`{"status": ..., "headers": {...}, "body": "<base64>"}`) back on stdout.
+it the request as JSON on stdin, and expects a JSON response back on
+stdout.
+
+**Request** (on stdin):
+
+```json
+{
+  "method": "GET",
+  "url": "http://api.example.com/v1/users/42",
+  "headers": { "Accept": "application/json", "Authorization": "Bearer ..." },
+  "body": null
+}
+```
+
+- `method` — the HTTP method, uppercase (`GET`, `POST`, ...).
+- `url` — the full request URL the app called, including query string.
+- `headers` — every request header as a flat string map. A header sent
+  multiple times is joined into one comma-separated value.
+- `body` — the request body, base64-encoded, or `null` if the request had
+  no body (e.g. most `GET`s).
+
+**Response** (expected on stdout):
+
+```json
+{
+  "status": 200,
+  "headers": { "Content-Type": "application/json" },
+  "body": "eyJpZCI6IDQyfQ=="
+}
+```
+
+- `status` — the HTTP status code to send back.
+- `headers` — response headers as a flat string map (optional; omit or use
+  `{}` for none).
+- `body` — the response body, base64-encoded. Decode/encode from your
+  script's native string type — e.g. in Python,
+  `base64.b64encode(json.dumps({"id": 42}).encode()).decode()`; in Node,
+  `Buffer.from(JSON.stringify({ id: 42 })).toString("base64")`.
+
+A non-zero exit code, or stdout that doesn't parse into this shape, is
+turned into a `500` response describing the failure (rule name and error
+message) — the app still gets *a* response, it just won't be the one your
+script intended.
 
 ## Project status
 
