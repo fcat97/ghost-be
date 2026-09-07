@@ -54,9 +54,19 @@ yes | "$SDKMANAGER" --licenses
 # sdkmanager under $ANDROID_HOME and run --licenses with it too, so
 # whichever binary the real build ends up consulting has already accepted
 # whatever it thinks needs accepting.
+#
+# JitPack's image also carries a legacy tools/bin/sdkmanager (pre-dating
+# the cmdline-tools rename) that crashes under a modern JDK (missing
+# javax.xml.bind, removed since JDK 11) -- harmless to us since we don't
+# need that one specifically, but with `set -e` its crash would otherwise
+# abort this script before we ever reach the sdkmanager we actually care
+# about. Tolerate a failure on any one binary and keep going to the rest.
 find "$ANDROID_HOME" -path "$SDKMANAGER" -prune -o -type f -name sdkmanager -print 2>/dev/null |
 while IFS= read -r other_sdkmanager; do
   echo "Also accepting licenses via $other_sdkmanager" >&2
-  "$other_sdkmanager" --list > /dev/null
-  yes | "$other_sdkmanager" --licenses
+  if ! "$other_sdkmanager" --list > /dev/null 2>&1; then
+    echo "  ...failed to list packages via $other_sdkmanager, skipping it" >&2
+    continue
+  fi
+  yes | "$other_sdkmanager" --licenses || true
 done
