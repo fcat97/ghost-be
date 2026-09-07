@@ -1,7 +1,7 @@
 # GhostBe: iOS/Alamofire Interceptor — Design
 
 Status: approved for planning
-Date: 2026-09-07
+Date: 2026-09-07 (revised same day: pure-Swift approach, see §4)
 
 ## 1. Purpose
 
@@ -48,72 +48,137 @@ subclass ([KT-23529] and related issues).
 
 [KT-23529]: https://youtrack.jetbrains.com/issue/KT-23529
 
-## 4. Architecture
+## 4. Architecture: pure native Swift, no shared Kotlin core
 
-`client/` becomes genuinely multiplatform: `android` (existing) plus
-`iosArm64` + `iosSimulatorArm64` (new). The wire-protocol logic — building
-the request envelope, JSON encode/decode, deciding mock-vs-passthrough —
-moves from the Android-only `client/src/{Envelope,GhostBeInterceptor}.kt`
-into common code. The one platform-specific piece, actually sending the
-envelope to `ghost-be`'s `/intercept` endpoint and reading the response,
-sits behind an `expect`/`actual`: Android keeps its existing OkHttp-based
-call, iOS gets a new `NSURLSession`-based `actual` (ordinary instance-level
-Foundation interop, not affected by the class-method limitation above).
+An earlier revision of this design proposed sharing the wire-protocol logic
+(envelope building, JSON encode/decode, mock-vs-passthrough decision) with
+Android via a KMP-extended `client/` module, exported to Swift as an
+`.xcframework`, with only the unavoidable `NSURLProtocol` boilerplate
+written natively. That approach is not achievable with this project's
+tooling: implementing it (plan Task 1) confirmed that Amper (the Kotlin
+Toolchain, which this whole repo is built with) produces only a `.klib`
+for `kmp/lib` modules targeting iOS — never a `.framework`/`.xcframework`.
+Cross-checked against Kotlin's own documentation: every distribution
+method for consuming a KMP library from Swift (direct Xcode integration,
+SwiftPM export, CocoaPods) is explicitly a feature of the *Gradle* Kotlin
+Multiplatform plugin, not documented as supported by Amper, which has its
+own independent native-compilation pipeline entirely separate from Gradle
+(confirmed separately: Android modules in this repo visibly go through a
+real generated Gradle project; no native target — Linux, Windows, macOS,
+iOS — ever does).
 
-A small Kotlin object exposes the resulting decision to Swift:
+Rather than bolt on a second build tool (a hand-written Gradle project
+solely to produce the `.xcframework`, alongside Amper for everything else)
+to rescue the shared-Kotlin-core idea, this design instead drops it: the
+iOS client is a **plain native Swift Package**, hand-written, with no
+Kotlin/KMP involvement at all. This also matches where this project is
+headed next — a planned Flutter client package has nothing to do with KMP
+either, so there is no cross-platform-sharing payoff being given up by
+keeping each platform's client independent.
 
-```kotlin
-// client/src@ios/GhostBeCore.kt
-object GhostBeCore {
-    fun resolve(method: String, url: String, headers: Map<String, String>, body: ByteArray?): Decision
+The package (`ios/GhostBe/`, `Package.swift` at the repo root as SPM
+requires) hand-implements the same wire protocol `client/`'s Android
+`GhostBeInterceptor` already implements: build a request envelope, POST it
+as JSON to `ghost-be`'s `/intercept` endpoint, decode the JSON response,
+and either synthesize a mock response or let the request proceed for real.
+
+```swift
+// ios/GhostBe/Sources/GhostBe/Envelope.swift
+struct RequestEnvelope: Encodable {
+    let method: String
+    let url: String
+    let headers: [String: String]
+    let body: String?
 }
-sealed interface Decision {
-    data class Mock(val status: Int, val headers: Map<String, String>, val body: ByteArray) : Decision
-    object Passthrough : Decision
+
+enum ResponseEnvelope: Decodable {
+    case mock(status: Int, headers: [String: String], body: String)
+    case passthrough
+
+    private enum CodingKeys: String, CodingKey { case intercept, status, headers, body }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let intercept = try container.decodeIfPresent(Bool.self, forKey: .intercept) ?? false
+        if intercept {
+            self = .mock(
+                status: try container.decode(Int.self, forKey: .status),
+                headers: try container.decode([String: String].self, forKey: .headers),
+                body: try container.decode(String.self, forKey: .body)
+            )
+        } else {
+            self = .passthrough
+        }
+    }
 }
 ```
-
-This is exported as an `.xcframework` (classic Objective-C interop
-framework export — Kotlin's newer Swift export stays out of scope; it is
-still experimental and this design already carries enough unverified
-surface area).
-
-The actual `NSURLProtocol` subclass is native Swift, in a new Swift
-package at `ios/GhostBe/` (a `Package.swift` at the repo root, as SPM
-requires for remote consumption, with its target path pointing into
-`ios/GhostBe/Sources/`):
 
 ```swift
 // ios/GhostBe/Sources/GhostBe/GhostBeURLProtocol.swift
 final class GhostBeURLProtocol: URLProtocol {
+    private var task: URLSessionDataTask?
+    static var baseURL = "http://127.0.0.1:8787"
+
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
 
     override func startLoading() {
-        let decision = GhostBeCore.shared.resolve(
+        guard let client = client, let url = request.url else { return }
+
+        var headers: [String: String] = [:]
+        request.allHTTPHeaderFields?.forEach { headers[$0.key] = $0.value }
+        let envelope = RequestEnvelope(
             method: request.httpMethod ?? "GET",
-            url: request.url?.absoluteString ?? "",
-            headers: request.allHTTPHeaderFields ?? [:],
-            body: request.httpBody
+            url: url.absoluteString,
+            headers: headers,
+            body: request.httpBody?.base64EncodedString()
         )
-        switch decision {
-        case let mock as Decision.Mock:
-            let response = HTTPURLResponse(
-                url: request.url!, statusCode: Int(mock.status),
-                httpVersion: "HTTP/1.1", headerFields: mock.headers
-            )!
-            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-            client?.urlProtocol(self, didLoad: mock.body)
-            client?.urlProtocolDidFinishLoading(self)
-        default:
-            // Passthrough: let the real network handle it. URLProtocol has no
-            // built-in "proceed normally" -- this needs its own real network
-            // request whose result is relayed back through `client?`, mirroring
-            // what OkHttp's chain.proceed() does for free. See section 6.
-        }
+
+        let baseURL = Self.baseURL.hasSuffix("/") ? String(Self.baseURL.dropLast()) : Self.baseURL
+        var relayRequest = URLRequest(url: URL(string: baseURL + "/intercept")!)
+        relayRequest.httpMethod = "POST"
+        relayRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        relayRequest.httpBody = try? JSONEncoder().encode(envelope)
+
+        let relaySession = URLSession(configuration: .ephemeral)
+        relaySession.dataTask(with: relayRequest) { data, _, _ in
+            let decision = data.flatMap { try? JSONDecoder().decode(ResponseEnvelope.self, from: $0) } ?? .passthrough
+            switch decision {
+            case let .mock(status, mockHeaders, body):
+                let response = HTTPURLResponse(
+                    url: url, statusCode: status, httpVersion: "HTTP/1.1", headerFields: mockHeaders
+                )!
+                let bodyData = Data(base64Encoded: body) ?? Data()
+                client.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+                client.urlProtocol(self, didLoad: bodyData)
+                client.urlProtocolDidFinishLoading(self)
+            case .passthrough:
+                self.performRealRequest(client: client)
+            }
+        }.resume()
     }
 
-    override func stopLoading() {}
+    private func performRealRequest(client: URLProtocolClient) {
+        let realSession = URLSession(configuration: .default)
+        task = realSession.dataTask(with: request) { data, response, error in
+            if let error = error {
+                client.urlProtocol(self, didFailWithError: error)
+                return
+            }
+            if let response = response {
+                client.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            }
+            if let data = data {
+                client.urlProtocol(self, didLoad: data)
+            }
+            client.urlProtocolDidFinishLoading(self)
+        }
+        task?.resume()
+    }
+
+    override func stopLoading() {
+        task?.cancel()
+    }
 }
 ```
 
@@ -122,9 +187,13 @@ Alamofire `Session` with `GhostBeURLProtocol` pre-registered in its
 configuration:
 
 ```swift
+// ios/GhostBe/Sources/GhostBe/GhostBe.swift
+import Alamofire
+import Foundation
+
 public enum GhostBe {
     public static func session(baseURL: String = "http://127.0.0.1:8787") -> Session {
-        GhostBeCore.shared.configure(baseURL: baseURL)
+        GhostBeURLProtocol.baseURL = baseURL
         let configuration = URLSessionConfiguration.af.default
         configuration.protocolClasses = [GhostBeURLProtocol.self] + (configuration.protocolClasses ?? [])
         return Session(configuration: configuration)
@@ -138,25 +207,30 @@ misleading.
 
 ## 5. Data flow
 
-Identical in shape to Android: app issues a request through the
-`GhostBe.session(...)`-provided `Session` → `GhostBeURLProtocol.startLoading()`
-calls `GhostBeCore.resolve(...)` → that POSTs the envelope to `ghost-be`'s
-`/intercept` endpoint via `NSURLSession` and decodes the JSON response →
-`.Mock` synthesizes an `HTTPURLResponse` + data and finishes loading
-without the request ever reaching the real network; `.Passthrough` (or
-`ghost-be` unreachable) lets the real request proceed.
+App issues a request through the `GhostBe.session(...)`-provided `Session`
+→ `GhostBeURLProtocol.startLoading()` builds the envelope and POSTs it to
+`ghost-be`'s `/intercept` endpoint via a plain `URLSession` call → decodes
+the JSON response → `.mock` synthesizes an `HTTPURLResponse` + data and
+finishes loading without the request ever reaching the real network;
+`.passthrough` (or `ghost-be` unreachable, which decodes to the same
+`.passthrough` fallback per the `data.flatMap { ... } ?? .passthrough` in
+§4) issues the real request itself and relays every callback back through
+`client`.
 
 ## 6. Open design gap: passthrough needs a real network request
 
 Unlike OkHttp's `chain.proceed(request)` (which the interceptor gets "for
 free" from the chain), `URLProtocol` has no equivalent single call — on
-passthrough, this protocol must issue its own real `NSURLSession` request
+passthrough, this protocol must issue its own real `URLSession` request
 for the original URL and relay every callback (data, response, completion,
-error) back through `client?`. This is standard practice for
+error) back through `client`. This is standard practice for
 `URLProtocol`-based mocking libraries but adds real implementation surface
 (redirect handling, streaming bodies, cancellation) not present in the
 OkHttp version. The implementation plan must size this properly rather
-than treating it as a one-line delegate call.
+than treating it as a one-line delegate call. (§4's code sketch already
+implements a first pass at this — `performRealRequest` — but redirect and
+streaming-body handling are not yet addressed there and should be treated
+as real open items in the implementation plan, not assumed solved.)
 
 ## 7. Error handling
 
@@ -166,31 +240,35 @@ hard failure surfaced to the app.
 
 ## 8. Distribution
 
-CI (`macos-latest`) builds the `.xcframework` from the iOS-extended
-`client/` module and attaches it to GitHub Releases, the same pattern
-already used for the Linux/Windows/macOS `ghost-be` binaries and the
-Android AAR. `Package.swift` at the repo root declares a `.binaryTarget`
-pointing at that release asset (URL + checksum) plus a regular target for
-`ios/GhostBe/Sources/` (the Swift shell). Consumers add it via Xcode's
-"Add Package Dependency" pointing at this repo; they never need the Kotlin
-Toolchain installed.
+Plain source-based SPM package — no Kotlin Toolchain, no `.xcframework`,
+no binary target, no release-asset/checksum machinery. `Package.swift` at
+the repo root declares a single library target pointing at
+`ios/GhostBe/Sources/GhostBe/` and an Alamofire dependency. Consumers add
+it via Xcode's "Add Package Dependency" pointing at this repo (or a tagged
+version of it); Xcode compiles it from source like any other Swift
+package. This is simpler than the original xcframework plan in every way
+except that there is now a second hand-maintained implementation of the
+wire protocol (Android's Kotlin, iOS's Swift) to keep in sync by hand —
+an accepted tradeoff given §4's finding.
 
 ## 9. Testing
 
-Mirrors the `server-macos` validation pattern established earlier in this
-project: a `workflow_dispatch`-only `ios-check.yml` on `macos-latest`
-builds the `.xcframework` and runs both the shared Kotlin tests
-(`iosSimulatorArm64`, executable in CI via the simulator) and a Swift test
-target exercising `GhostBeURLProtocol` end-to-end against a stub `ghost-be`
-(mock/status endpoint), before this is ever wired into the real
-`release.yml`. Nothing here can be verified on a non-Apple host, matching
-the constraint already documented for `server-macos`.
+A `workflow_dispatch`-only `ios-check.yml` on `macos-latest` runs
+`swift build` and `swift test` — no Kotlin, no xcframework step. The test
+target exercises `GhostBeURLProtocol` end-to-end against a stub `ghost-be`
+(a `python3 -m http.server`-style stub launched as a subprocess, serving a
+canned `/intercept` response) before this is ever wired into the real
+`release.yml`. `swift build`/`swift test` need a real Apple host (Swift
+itself has a Linux toolchain, but `URLProtocol`'s integration surface here
+is Foundation/Darwin-specific enough, and this project has no local Swift
+toolchain installed, that CI remains the only verification venue, matching
+every other Apple-platform constraint already documented in this project).
 
 ## 10. Non-goals
 
 - No `RequestInterceptor` conformance (section 4).
-- No Kotlin Swift export (section 4) — classic Objective-C framework
-  export only, for now.
+- No shared Kotlin/KMP code, no `.xcframework`, no Kotlin Toolchain
+  involvement in the iOS client at all (section 4).
 - No CocoaPods distribution — SPM only.
 - Minimum deployment target iOS 13 (a common modern Alamofire/SPM
   baseline; `URLProtocol`'s callback API has been stable since long
@@ -200,11 +278,10 @@ the constraint already documented for `server-macos`.
 
 ## 11. Open risks carried into implementation
 
-- Kotlin/Native's `NSURLSession`-based `actual` networking call for the
-  shared core is unverified — everything in this design that touches
-  Apple APIs can only be validated on `macos-latest` CI, the same
-  constraint (and the same slower, CI-round-trip-driven debugging loop)
-  encountered building `server-macos`.
-- Section 6 (passthrough via a real relayed `NSURLSession` request) is the
+- Section 6 (passthrough via a real relayed `URLSession` request) is the
   single largest unknown-complexity item in this design and should be its
-  own early task in the implementation plan, not an afterthought.
+  own early task in the implementation plan, not an afterthought — the
+  §4 code sketch is a first pass, not a verified-correct implementation.
+- Nothing in this design has been compiled or run anywhere; the entire
+  Swift package is unverified until `ios-check.yml` actually runs it on
+  `macos-latest`.
