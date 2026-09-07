@@ -200,7 +200,7 @@ git commit -m "feat: scaffold flutter/ghost_be package, implement envelope encod
 - Consumes: `RequestEnvelope`, `ResponseEnvelope`/`MockResponseEnvelope`/`PassthroughResponseEnvelope` from Task 1.
 - Produces: `GhostBeInterceptor({String baseUrl})` extending `dio`'s `Interceptor` — the package's public API.
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Uses Dart's own `dart:io HttpServer` as the stub — no subprocess needed, and `HttpServer.bind` only completes once actually listening (no polling required, unlike the iOS test's stub-startup wait).
 
@@ -269,12 +269,12 @@ void main() {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `cd flutter/ghost_be && dart test test/ghost_be_interceptor_test.dart`
 Expected: FAIL — `GhostBeInterceptor` doesn't exist yet.
 
-- [ ] **Step 3: Write `ghost_be_interceptor.dart`**
+- [x] **Step 3: Write `ghost_be_interceptor.dart`**
 
 ```dart
 // flutter/ghost_be/lib/src/ghost_be_interceptor.dart
@@ -348,17 +348,17 @@ class GhostBeInterceptor extends Interceptor {
 }
 ```
 
-- [ ] **Step 4: Run test to verify it passes**
+- [x] **Step 4: Run test to verify it passes**
 
 Run: `cd flutter/ghost_be && dart test`
 Expected: PASS — all 7 tests (4 from Task 1's `envelope_test.dart`, 3 here).
 
-- [ ] **Step 5: Run static analysis**
+- [x] **Step 5: Run static analysis**
 
 Run: `cd flutter/ghost_be && dart analyze`
 Expected: "No issues found!" Fix anything it flags before moving on.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add flutter/ghost_be/lib/ flutter/ghost_be/test/ghost_be_interceptor_test.dart
