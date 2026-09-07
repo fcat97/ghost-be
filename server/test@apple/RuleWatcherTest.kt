@@ -18,7 +18,7 @@ class RuleWatcherTest {
 
         val worker = Worker.start(name = "rule-watcher-test")
         worker.execute(TransferMode.SAFE, { dir to changeCount }) { (watchedDir, counter) ->
-            watchRulesDirectory(watchedDir) { counter.incrementAndFetch() }
+            watchRulesDirectory(watchedDir) { counter.value = counter.value + 1 }
         }
 
         // Give the worker time to actually call kqueue()/open() before we write --
