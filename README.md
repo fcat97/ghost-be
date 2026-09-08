@@ -56,8 +56,7 @@ runtime dependency versions in that tag's `client-android/module.yaml` if you're
 not on the latest release.)
 
 Add the interceptor to whichever `OkHttpClient` your app uses — typically
-only in a debug or test build variant, since it adds a network hop to every
-request:
+only in a debug or test build variant:
 
 ```kotlin
 val client = OkHttpClient.Builder()
@@ -88,12 +87,6 @@ session.request("https://api.example.com/v1/users/42")
     }
 ```
 
-Alamofire's own `RequestInterceptor` can't do this (it can't substitute a
-fake response, only modify requests or retry — see the
-[design doc](docs/superpowers/specs/2026-09-07-ios-alamofire-interceptor-design.md#2-why-not-requestinterceptor)
-for why), so `GhostBe.session(...)` works instead by registering a custom
-`URLProtocol` into the session's configuration.
-
 ### Flutter
 
 Add this repo as a git dependency in `pubspec.yaml`:
@@ -115,41 +108,24 @@ import 'package:ghost_be/ghost_be.dart';
 final dio = Dio()..interceptors.add(GhostBeInterceptor(baseUrl: 'http://127.0.0.1:44678'));
 ```
 
-Unlike Alamofire's `RequestInterceptor`, dio's `Interceptor.onRequest` can
-fully substitute a fake response (`handler.resolve(...)`), so no low-level
-workaround is needed here — it's a plain dio interceptor, same shape as
-the Android client.
-
 That's it on the app side. Everything else is configuring and running
 `ghost-be`.
 
 ### Testing on a physical device over Wi-Fi
 
-The examples above assume the app and `ghost-be` are reachable at
-`127.0.0.1` — true on a simulator/emulator, or a physical device tunneled
-over `adb reverse`. A QA tester driving the app over Wi-Fi with no cable
-and no code access has neither, so all three clients accept a deep
-link/app link instead of a hardcoded `baseUrl`:
+For a QA tester with no cable and no code access, all three clients accept
+the server address via a deep link instead of a hardcoded `baseUrl`:
 
-1. Start `ghost-be` with `--host 0.0.0.0` so it's reachable from other
-   devices on the LAN, and note the machine's LAN IP (`ipconfig getifaddr en0`
-   on macOS, `hostname -I` on Linux).
-2. Send the tester a link like `myapp://open?ghostBe=192.168.1.5:44678`
-   (whatever URL scheme/host the app already handles) — any channel works:
-   Slack, a QR code, a text message.
-3. The tester taps the link, then uses the app normally. Every request for
-   the rest of that run is relayed to the `ghostBe` address instead of the
-   client's configured default — there's no discovery, no permission
-   prompt, and nothing to persist, since the app being killed is exactly
-   when a QA session naturally ends too.
+1. Start `ghost-be --host 0.0.0.0` and find the machine's LAN IP
+   (`ipconfig getifaddr en0` on macOS, `hostname -I` on Linux).
+2. Send the tester a link: `myapp://open?ghostBe=192.168.1.5:44678`.
+3. Tapping it points every request for that run at that address.
 
-This only works if the app already hands incoming links to `GhostBe` —
-wire it into whichever screen/method the app uses to receive deep links
-(splash screen, launcher `Activity`, `AppDelegate`/`SceneDelegate`, or a
-Flutter deep-link package's callback):
+For step 3 to work, wire the app's deep-link handler to `GhostBe` (add a
+bare scheme if it has none):
 
 ```kotlin
-// Android: an Activity's onCreate/onNewIntent
+// Android
 override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
     GhostBe.captureFromIntent(intent)
@@ -157,7 +133,7 @@ override fun onCreate(savedInstanceState: Bundle?) {
 ```
 
 ```swift
-// iOS: UIApplicationDelegate
+// iOS
 func application(_ app: UIApplication, open url: URL, options: ...) -> Bool {
     GhostBe.captureFromURL(url)
     return true
@@ -165,14 +141,9 @@ func application(_ app: UIApplication, open url: URL, options: ...) -> Bool {
 ```
 
 ```dart
-// Flutter: wherever the app already listens for incoming links
-final appLinks = AppLinks();
-appLinks.uriLinkStream.listen(GhostBe.captureFromUri);
+// Flutter
+AppLinks().uriLinkStream.listen(GhostBe.captureFromUri);
 ```
-
-If the app doesn't have a deep-link scheme set up at all, this is the one
-thing that needs adding to the target project for this workflow — a
-single scheme/host is enough, it doesn't need to route anywhere real.
 
 ## Running ghost-be
 
@@ -269,9 +240,7 @@ The Kotlin/Native and Android pieces are built with the
 clients are separate, plain packages — a Swift Package (`Package.swift`
 at the repo root, built with `swift build`/`swift test`) and a Dart
 package (`client-flutter/pubspec.yaml`, built with `dart pub get`/
-`dart test`) respectively — neither involves Kotlin/KMP at all (see the
-[iOS design doc](docs/superpowers/specs/2026-09-07-ios-alamofire-interceptor-design.md#4-architecture-pure-native-swift-no-shared-kotlin-core)
-for why).
+`dart test`) respectively — neither involves Kotlin/KMP at all.
 
 | Module | What it is |
 |---|---|
