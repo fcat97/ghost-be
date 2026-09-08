@@ -11,6 +11,11 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.yield
 import okio.Path.Companion.toPath
 
 class InterceptRouteTest {
@@ -74,5 +79,40 @@ class InterceptRouteTest {
         val bodyBase64 = Regex(""""body":"([^"]+)"""").find(text)!!.groupValues[1]
         val decodedBody = Base64.decode(bodyBase64).decodeToString()
         assertTrue(decodedBody.contains("broken"))
+    }
+
+    @Test
+    fun `broadcasts a traffic event for a matched rule`() = runBlocking {
+        withTimeout(5000) {
+            val received = async { TrafficBroadcaster.events.first() }
+            yield()
+            testApp { client ->
+                client.post("/intercept") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"method":"GET","url":"https://api.example.com/v1/users/42","headers":{},"body":null}""")
+                }
+            }
+            val event = received.await()
+            assertEquals("GET", event.method)
+            assertEquals("get-user-42", event.ruleMatched)
+            assertEquals(200, event.status)
+        }
+    }
+
+    @Test
+    fun `broadcasts a traffic event with a null ruleMatched for passthrough`() = runBlocking {
+        withTimeout(5000) {
+            val received = async { TrafficBroadcaster.events.first() }
+            yield()
+            testApp { client ->
+                client.post("/intercept") {
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"method":"GET","url":"https://api.example.com/v1/other","headers":{},"body":null}""")
+                }
+            }
+            val event = received.await()
+            assertEquals(null, event.ruleMatched)
+            assertEquals(null, event.status)
+        }
     }
 }

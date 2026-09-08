@@ -17,6 +17,7 @@ fun Route.interceptRoute(currentRules: () -> List<Rule>, resolver: ResponseResol
 
         if (rule == null) {
             println("ghost-be: $requestLabel -> passthrough")
+            TrafficBroadcaster.publish(TrafficEvent(envelope.method, envelope.url, ruleMatched = null, status = null))
             call.respondText(ResponseEnvelope.Passthrough().toJson(), ContentType.Application.Json)
             return@post
         }
@@ -42,6 +43,8 @@ fun Route.interceptRoute(currentRules: () -> List<Rule>, resolver: ResponseResol
                 )
             }
         }
+        val statusForEvent = (responseEnvelope as? ResponseEnvelope.Mock)?.status
+        TrafficBroadcaster.publish(TrafficEvent(envelope.method, envelope.url, ruleMatched = rule.name, status = statusForEvent))
         call.respondText(responseEnvelope.toJson(), ContentType.Application.Json)
     }
 }
