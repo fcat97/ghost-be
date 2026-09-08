@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -24,18 +22,14 @@ fun RuleEditorPane(state: AppState, modifier: Modifier = Modifier) {
     Column(modifier = modifier.fillMaxSize().background(Palette.bgSecondary)) {
         PaneHeader(title = if (state.editingPath.isNullOrEmpty() && state.editingIsNew) "new_rule.yaml" else (state.editingPath ?: "no file selected")) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(
-                    onClick = { state.cancelEditing() },
-                    colors = ButtonDefaults.buttonColors(containerColor = Palette.border, contentColor = Palette.textMain)
-                ) { Text("Discard") }
-                Button(
-                    onClick = { state.validateEditing() },
-                    colors = ButtonDefaults.buttonColors(containerColor = Palette.border, contentColor = Palette.textMain)
-                ) { Text("Validate") }
-                Button(
+                AppButton(text = "Discard", onClick = { state.cancelEditing() })
+                AppButton(text = "Validate", onClick = { state.validateEditing() })
+                AppButton(
+                    text = "Apply & Save",
                     onClick = { state.saveEditing() },
-                    colors = ButtonDefaults.buttonColors(containerColor = Palette.accent, contentColor = Palette.bgPrimary)
-                ) { Text("Apply & Save") }
+                    containerColor = Palette.accent,
+                    contentColor = Palette.bgPrimary
+                )
             }
         }
 

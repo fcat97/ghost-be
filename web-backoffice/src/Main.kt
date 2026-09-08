@@ -21,11 +21,14 @@ fun App() {
     }
     Column(modifier = Modifier.fillMaxSize().background(Palette.bgPrimary)) {
         HeaderBar()
+        HDivider()
         Column(modifier = Modifier.weight(1f)) {
             Row(modifier = Modifier.weight(0.55f)) {
                 RulesPane(state, modifier = Modifier.weight(0.45f))
+                VDivider()
                 RuleEditorPane(state, modifier = Modifier.weight(0.55f))
             }
+            HDivider()
             TrafficPane(state, modifier = Modifier.weight(0.45f))
         }
     }

@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -28,15 +26,16 @@ fun TrafficPane(state: AppState, modifier: Modifier = Modifier) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text("Live Request & Response Console", color = Palette.textMuted)
-            Button(
-                onClick = { state.clearTraffic() },
-                colors = ButtonDefaults.buttonColors(containerColor = Palette.border, contentColor = Palette.textMain)
-            ) { Text("Clear logs") }
+            AppButton(text = "Clear logs", onClick = { state.clearTraffic() }, small = true)
         }
+        HDivider()
 
         LazyColumn(modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp)) {
             items(state.traffic) { event ->
-                Row(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     val (tag, tagColor) = if (event.ruleMatched != null) "IN " to Palette.accent else "SYS" to Palette.warning
                     Text(tag, color = tagColor, fontFamily = FontFamily.Monospace)
                     Text("  ", fontFamily = FontFamily.Monospace)
@@ -52,10 +51,13 @@ fun TrafficPane(state: AppState, modifier: Modifier = Modifier) {
                     }
                     Text(label, color = statusColor, fontFamily = FontFamily.Monospace, modifier = Modifier.weight(1f))
                     if (event.ruleMatched != null) {
-                        Button(
+                        AppButton(
+                            text = "Create rule from this",
                             onClick = { state.createRuleFromTraffic(event) },
-                            colors = ButtonDefaults.buttonColors(containerColor = Palette.accent, contentColor = Palette.bgPrimary)
-                        ) { Text("Create rule from this") }
+                            containerColor = Palette.accent,
+                            contentColor = Palette.bgPrimary,
+                            small = true
+                        )
                     }
                 }
             }

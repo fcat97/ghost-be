@@ -9,10 +9,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -24,10 +20,7 @@ import androidx.compose.ui.unit.dp
 fun RulesPane(state: AppState, modifier: Modifier = Modifier) {
     Column(modifier = modifier.fillMaxSize().background(Palette.bgSecondary)) {
         PaneHeader(title = "Gateway Rules") {
-            Button(
-                onClick = { state.startCreating() },
-                colors = ButtonDefaults.buttonColors(containerColor = Palette.border, contentColor = Palette.textMain)
-            ) { Text("+ New Rule") }
+            AppButton(text = "+ New Rule", onClick = { state.startCreating() })
         }
 
         LazyColumn(modifier = Modifier.fillMaxSize().padding(16.dp)) {
@@ -45,13 +38,16 @@ fun RulesPane(state: AppState, modifier: Modifier = Modifier) {
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         Text(file.path, color = Palette.textMuted)
-                        Button(
+                        AppButton(
+                            text = "Delete file",
                             onClick = { state.deleteRuleFile(file.path) },
-                            colors = ButtonDefaults.buttonColors(containerColor = Palette.danger, contentColor = Palette.textMain)
-                        ) { Text("Delete file") }
+                            containerColor = Palette.danger,
+                            small = true
+                        )
                     }
                 }
             }
@@ -82,30 +78,26 @@ fun RuleCard(
             Text(description, color = Palette.textMuted)
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Switch(
-                checked = enabled,
-                onCheckedChange = { onToggle() },
-                colors = SwitchDefaults.colors(checkedTrackColor = Palette.success)
-            )
-            Button(
-                onClick = onEdit,
-                colors = ButtonDefaults.buttonColors(containerColor = Palette.border, contentColor = Palette.textMain)
-            ) { Text("Edit") }
+            SmallSwitch(checked = enabled, onCheckedChange = { onToggle() })
+            EditIconButton(onClick = onEdit)
         }
     }
 }
 
 @Composable
 fun PaneHeader(title: String, actions: @Composable () -> Unit = {}) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Palette.bgCard)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(title, color = Palette.textMain, fontWeight = FontWeight.Bold)
-        actions()
+    Column {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Palette.bgCard)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(title, color = Palette.textMain, fontWeight = FontWeight.Bold)
+            actions()
+        }
+        HDivider()
     }
 }
