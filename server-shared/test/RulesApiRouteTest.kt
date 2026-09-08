@@ -8,6 +8,7 @@ import io.ktor.server.testing.*
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
+import okio.FileSystem
 import okio.Path.Companion.toPath
 
 class RulesApiRouteTest {
@@ -31,5 +32,75 @@ class RulesApiRouteTest {
         assertTrue(text.contains("\"name\":\"checkout-fails\""))
         assertTrue(text.contains("\"enabled\":false"))
         assertTrue(text.contains("rules:")) // the raw content field round-tripped
+    }
+
+    @Test
+    fun `creates a new rule file`() = testApp { client ->
+        val response = client.post("/api/rules") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"path":"new-rule.yaml","content":"rules:\n  - name: new-rule\n    match: { method: GET, path: /v1/new }\n    response: { file: responses/new.json, status: 200 }\n"}""")
+        }
+        assertEquals(HttpStatusCode.Created, response.status)
+        assertTrue(FileSystem.SYSTEM.exists(rulesDir / "new-rule.yaml"))
+        FileSystem.SYSTEM.delete(rulesDir / "new-rule.yaml")
+    }
+
+    @Test
+    fun `rejects creating a rule file that already exists`() = testApp { client ->
+        val response = client.post("/api/rules") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"path":"existing.yaml","content":"rules: []"}""")
+        }
+        assertEquals(HttpStatusCode.Conflict, response.status)
+    }
+
+    @Test
+    fun `overwrites an existing rule file with valid content`() = testApp { client ->
+        FileSystem.SYSTEM.write(rulesDir / "editable.yaml") { writeUtf8("rules: []") }
+        val response = client.put("/api/rules/editable.yaml") {
+            setBody("rules:\n  - name: edited\n    match: { method: GET, path: /v1/edited }\n    response: { file: r.json, status: 200 }\n")
+        }
+        assertEquals(HttpStatusCode.OK, response.status)
+        val onDisk = FileSystem.SYSTEM.read(rulesDir / "editable.yaml") { readUtf8() }
+        assertTrue(onDisk.contains("edited"))
+        FileSystem.SYSTEM.delete(rulesDir / "editable.yaml")
+    }
+
+    @Test
+    fun `rejects overwriting with malformed yaml and leaves the file untouched`() = testApp { client ->
+        FileSystem.SYSTEM.write(rulesDir / "protected.yaml") { writeUtf8("rules: []") }
+        val response = client.put("/api/rules/protected.yaml") {
+            setBody("rules: [this is not: valid: yaml structure")
+        }
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        val onDisk = FileSystem.SYSTEM.read(rulesDir / "protected.yaml") { readUtf8() }
+        assertEquals("rules: []", onDisk)
+        FileSystem.SYSTEM.delete(rulesDir / "protected.yaml")
+    }
+
+    @Test
+    fun `404s when editing a rule file that does not exist`() = testApp { client ->
+        val response = client.put("/api/rules/does-not-exist.yaml") { setBody("rules: []") }
+        assertEquals(HttpStatusCode.NotFound, response.status)
+    }
+
+    @Test
+    fun `rejects a path escaping the rules directory`() = testApp { client ->
+        val response = client.put("/api/rules/..%2F..%2Fetc%2Fpasswd") { setBody("rules: []") }
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+    }
+
+    @Test
+    fun `deletes a rule file`() = testApp { client ->
+        FileSystem.SYSTEM.write(rulesDir / "deletable.yaml") { writeUtf8("rules: []") }
+        val response = client.delete("/api/rules/deletable.yaml")
+        assertEquals(HttpStatusCode.OK, response.status)
+        assertTrue(!FileSystem.SYSTEM.exists(rulesDir / "deletable.yaml"))
+    }
+
+    @Test
+    fun `404s when deleting a rule file that does not exist`() = testApp { client ->
+        val response = client.delete("/api/rules/does-not-exist.yaml")
+        assertEquals(HttpStatusCode.NotFound, response.status)
     }
 }
