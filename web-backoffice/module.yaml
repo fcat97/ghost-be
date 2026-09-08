@@ -5,6 +5,10 @@ dependencies:
   - $compose.foundation
   - $compose.material3
   - $compose.ui
+  - org.jetbrains.kotlinx:kotlinx-browser:0.5.0
+  - org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0
 
 settings:
   compose: enabled
+  kotlin:
+    serialization: json
