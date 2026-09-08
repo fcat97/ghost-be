@@ -1,8 +1,10 @@
 package ghostbe.server
 
+import io.ktor.server.application.install
 import io.ktor.server.cio.CIO
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.routing.routing
+import io.ktor.server.sse.SSE
 import kotlin.concurrent.AtomicReference
 import kotlin.native.concurrent.TransferMode
 import kotlin.native.concurrent.Worker
@@ -54,23 +56,26 @@ https://github.com/fcat97/ghost-be
 private const val USAGE = """Usage: ghost-be [options]
 
 Options:
-  --port <port>   Port to listen on (default: 44678)
-  --rules <dir>   Directory of rule .yaml files to watch (default: ./rules)
-  --host <addr>   Address to bind (default: 127.0.0.1; use 0.0.0.0 to allow
-                  connections from other devices on the LAN)
-  -h, --help      Show this help and exit
+  --port <port>     Port to listen on (default: 44678)
+  --rules <dir>     Directory of rule .yaml files to watch (default: ./rules)
+  --host <addr>     Address to bind (default: 127.0.0.1; use 0.0.0.0 to allow
+                    connections from other devices on the LAN)
+  --web-dist <dir>  Directory of the built web-backoffice static files
+                    (default: web-backoffice/build/tasks/_web-backoffice_buildWasmJsAppWasmJsRelease)
+  -h, --help        Show this help and exit
 
 Docs: https://github.com/fcat97/ghost-be#readme"""
 
 private sealed interface ParsedArgs {
     data object Help : ParsedArgs
-    data class Run(val port: Int, val rulesDir: String, val host: String) : ParsedArgs
+    data class Run(val port: Int, val rulesDir: String, val host: String, val webDist: String) : ParsedArgs
 }
 
 private fun parseArgs(args: Array<String>): ParsedArgs {
     var port = 44678
     var rulesDir = "./rules"
     var host = "127.0.0.1"
+    var webDist = "web-backoffice/build/tasks/_web-backoffice_buildWasmJsAppWasmJsRelease"
     var i = 0
     while (i < args.size) {
         when (args[i]) {
@@ -78,10 +83,11 @@ private fun parseArgs(args: Array<String>): ParsedArgs {
             "--port" -> { port = args[i + 1].toInt(); i += 2 }
             "--rules" -> { rulesDir = args[i + 1]; i += 2 }
             "--host" -> { host = args[i + 1]; i += 2 }
+            "--web-dist" -> { webDist = args[i + 1]; i += 2 }
             else -> { i += 1 }
         }
     }
-    return ParsedArgs.Run(port, rulesDir, host)
+    return ParsedArgs.Run(port, rulesDir, host, webDist)
 }
 
 private fun loadRulesOrExit(rulesDir: Path): List<Rule> {
@@ -105,12 +111,16 @@ fun main(args: Array<String>) {
         println(USAGE)
         return
     }
-    val (port, rulesDirArg, host) = parsed as ParsedArgs.Run
+    val (port, rulesDirArg, host, webDistArg) = parsed as ParsedArgs.Run
     val rulesDir = rulesDirArg.toPath()
+    val webDist = webDistArg.toPath()
 
     println(BANNER)
     val rulesRef = AtomicReference(loadRulesOrExit(rulesDir))
     println("ghost-be: loaded ${rulesRef.value.size} rule(s) from $rulesDir")
+    if (!FileSystem.SYSTEM.exists(webDist)) {
+        println("ghost-be: web-backoffice UI not found at $webDist -- build it with './kotlin build -m web-backoffice -v release', or point --web-dist at an existing build")
+    }
     println("ghost-be: listening on http://$host:$port")
 
     Worker.start(name = "rule-watcher").execute(TransferMode.SAFE, { rulesDir to rulesRef }) { (dir, ref) ->
@@ -128,8 +138,12 @@ fun main(args: Array<String>) {
 
     val resolver = ResponseResolver(rulesDir)
     embeddedServer(CIO, port = port, host = host) {
+        install(SSE)
         routing {
             interceptRoute({ rulesRef.value }, resolver)
+            rulesApiRoute(rulesDir)
+            trafficSseRoute()
+            webStaticRoute(webDist)
         }
     }.start(wait = true)
 }
