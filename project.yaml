@@ -5,3 +5,4 @@ modules:
   - server-macos
   - server-shared
   - server-windows
+  - web-backoffice
