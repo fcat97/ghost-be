@@ -1,0 +1,8 @@
+rules:
+  - name: get-user-42
+    match: { method: GET, path: /v1/users/42 }
+    response: { file: responses/user-42.json, status: 200 }
+  - name: checkout-fails
+    match: { method: POST, path: /v1/checkout }
+    response: { file: responses/checkout-500.json, status: 500 }
+    enabled: false
