@@ -109,4 +109,25 @@ fun Route.rulesApiRoute(rulesDir: Path, fileSystem: FileSystem = FileSystem.SYST
         fileSystem.delete(resolved)
         call.respondText("ok", ContentType.Text.Plain, HttpStatusCode.OK)
     }
+
+    post("/api/rules/{path}/{ruleName}/toggle") {
+        val requestedPath = call.parameters["path"]!!
+        val ruleName = call.parameters["ruleName"]!!
+        val resolved = resolveRuleFilePath(rulesDir, requestedPath)
+        if (resolved == null || !fileSystem.exists(resolved)) {
+            call.respondText("not found", ContentType.Text.Plain, HttpStatusCode.NotFound)
+            return@post
+        }
+        val content = fileSystem.read(resolved) { readUtf8() }
+        val ruleFile = loadRuleFile(content)
+        if (ruleFile.rules.none { it.name == ruleName }) {
+            call.respondText("rule not found", ContentType.Text.Plain, HttpStatusCode.NotFound)
+            return@post
+        }
+        val toggled = ruleFile.rules.map { rule ->
+            if (rule.name == ruleName) rule.copy(enabled = !rule.enabled) else rule
+        }
+        fileSystem.write(resolved) { writeUtf8(renderRuleFile(RuleFile(toggled))) }
+        call.respondText("ok", ContentType.Text.Plain, HttpStatusCode.OK)
+    }
 }

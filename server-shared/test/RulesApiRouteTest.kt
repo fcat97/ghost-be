@@ -103,4 +103,24 @@ class RulesApiRouteTest {
         val response = client.delete("/api/rules/does-not-exist.yaml")
         assertEquals(HttpStatusCode.NotFound, response.status)
     }
+
+    @Test
+    fun `toggles a rule's enabled flag and persists it`() = testApp { client ->
+        FileSystem.SYSTEM.write(rulesDir / "toggleable.yaml") {
+            writeUtf8("rules:\n  - name: toggle-me\n    match: { method: GET, path: /v1/x }\n    response: { file: r.json, status: 200 }\n")
+        }
+        val response = client.post("/api/rules/toggleable.yaml/toggle-me/toggle")
+        assertEquals(HttpStatusCode.OK, response.status)
+        val onDisk = FileSystem.SYSTEM.read(rulesDir / "toggleable.yaml") { readUtf8() }
+        assertTrue(loadRuleFile(onDisk).rules.single { it.name == "toggle-me" }.enabled == false)
+        FileSystem.SYSTEM.delete(rulesDir / "toggleable.yaml")
+    }
+
+    @Test
+    fun `404s toggling a rule name that does not exist in the file`() = testApp { client ->
+        FileSystem.SYSTEM.write(rulesDir / "toggleable2.yaml") { writeUtf8("rules: []") }
+        val response = client.post("/api/rules/toggleable2.yaml/no-such-rule/toggle")
+        assertEquals(HttpStatusCode.NotFound, response.status)
+        FileSystem.SYSTEM.delete(rulesDir / "toggleable2.yaml")
+    }
 }
