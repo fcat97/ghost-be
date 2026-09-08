@@ -31,10 +31,10 @@ jobs:
         run: cp build/tasks/_server-windows_linkMingwX64Release/server-windows.exe ghost-be-windows-x64.exe
 
       - name: Build client release AAR
-        run: ./kotlin build -m client -v release
+        run: ./kotlin build -m client-android -v release
 
       - name: Stage client AAR
-        run: cp build/tasks/_client_aarAndroidRelease/client-jvm.aar "ghost-be-client-${GITHUB_REF_NAME}.aar"
+        run: cp build/tasks/_client-android_aarAndroidRelease/client-android-jvm.aar "ghost-be-client-${GITHUB_REF_NAME}.aar"
 
       - name: Upload release artifacts
         uses: softprops/action-gh-release@v2

@@ -49,7 +49,7 @@ curl -fsSL -o "app/libs/ghost-be-client-$tag.aar" \
 
 A raw local `.aar` doesn't carry its own dependency metadata, so declare
 its runtime dependencies alongside it in the target app's Gradle build
-(check `client/module.yaml` in this repo at the same tag if these versions
+(check `client-android/module.yaml` in this repo at the same tag if these versions
 have moved on):
 
 ```kotlin
@@ -118,7 +118,7 @@ dependencies:
   ghost_be:
     git:
       url: https://github.com/$owner/$repo
-      path: flutter/ghost_be
+      path: client-flutter/ghost_be
       ref: $tag
 ```
 

@@ -52,7 +52,7 @@ dependencies {
 ```
 
 (Replace `<tag>` with the release tag you downloaded; check the exact
-runtime dependency versions in that tag's `client/module.yaml` if you're
+runtime dependency versions in that tag's `client-android/module.yaml` if you're
 not on the latest release.)
 
 Add the interceptor to whichever `OkHttpClient` your app uses — typically
@@ -103,7 +103,7 @@ dependencies:
   ghost_be:
     git:
       url: https://github.com/fcat97/ghost-be
-      path: flutter/ghost_be
+      path: client-flutter/ghost_be
 ```
 
 Add the interceptor to whichever `Dio` instance your app uses:
@@ -217,25 +217,25 @@ The Kotlin/Native and Android pieces are built with the
 `project.yaml`, no Gradle files to author directly). The iOS and Flutter
 clients are separate, plain packages — a Swift Package (`Package.swift`
 at the repo root, built with `swift build`/`swift test`) and a Dart
-package (`flutter/ghost_be/pubspec.yaml`, built with `dart pub get`/
+package (`client-flutter/ghost_be/pubspec.yaml`, built with `dart pub get`/
 `dart test`) respectively — neither involves Kotlin/KMP at all (see the
 [iOS design doc](docs/superpowers/specs/2026-09-07-ios-alamofire-interceptor-design.md#4-architecture-pure-native-swift-no-shared-kotlin-core)
 for why).
 
 | Module | What it is |
 |---|---|
-| [`client/`](client) | The `GhostBeInterceptor` library (Android) |
-| [`ios/GhostBe/`](ios/GhostBe) | The iOS client (Swift Package, Alamofire-based — see "Using it in your app" above) |
-| [`flutter/ghost_be/`](flutter/ghost_be) | The Flutter client (Dart package, dio-based — see "Using it in your app" above) |
+| [`client-android/`](client-android) | The `GhostBeInterceptor` library (Android) |
+| [`client-ios/GhostBe/`](client-ios/GhostBe) | The iOS client (Swift Package, Alamofire-based — see "Using it in your app" above) |
+| [`client-flutter/ghost_be/`](client-flutter/ghost_be) | The Flutter client (Dart package, dio-based — see "Using it in your app" above) |
 | [`server/`](server) | `ghost-be`'s shared implementation (Kotlin/Native library, `linuxX64` + `mingwX64` + `macosArm64`) |
 | [`server-linux/`](server-linux) | The Linux `ghost-be` executable — thin wrapper around `server/`'s entry point |
 | [`server-windows/`](server-windows) | The Windows `ghost-be` executable — same, cross-compiled for `mingwX64` |
 | [`server-macos/`](server-macos) | The macOS (Apple Silicon) `ghost-be` executable — same, for `macosArm64` |
-| [`demo-app/`](demo-app) | A minimal Compose app for manually exercising `client/` (consumes it from local Maven, not as a project dependency — see below) |
+| [`demo-app/`](demo-app) | A minimal Compose app for manually exercising `client-android/` (consumes it from local Maven, not as a project dependency — see below) |
 | [`demo-backend/`](demo-backend) | A tiny Node "real backend" for the demo app to fall through to |
 
 **Prerequisites:** a JDK, the Android SDK (`ANDROID_HOME` set) for
-`client`/`demo-app`, and Node.js for `demo-backend`. `server-linux` and
+`client-android`/`demo-app`, and Node.js for `demo-backend`. `server-linux` and
 `server-windows` cross-compile from any host — no Docker or Windows
 machine needed. `server-macos` needs a real Mac (Apple's SDK can't be
 bundled the way mingw-w64 is); CI builds it on a `macos-latest` runner.
@@ -255,13 +255,13 @@ export ANDROID_HOME=/path/to/Android/Sdk
 
 `demo-app` depends on `dev.yellowbytes.ghostbe:client:0.1.0` resolved from
 your local Maven repository (`~/.m2/repository`), the same way a real
-consumer would depend on it — not on `client/` as an in-repo project. So
-any time you change `client/` and want `demo-app` to pick it up, publish it
-locally first:
+consumer would depend on it — not on `client-android/` as an in-repo
+project. So any time you change `client-android/` and want `demo-app` to
+pick it up, publish it locally first:
 
 ```bash
-# 0. Publish client to local Maven (repeat after any change to client/)
-./kotlin publish mavenLocal -m client
+# 0. Publish client to local Maven (repeat after any change to client-android/)
+./kotlin publish mavenLocal -m client-android
 
 # 1. Start the "real" backend
 node demo-backend/server.js

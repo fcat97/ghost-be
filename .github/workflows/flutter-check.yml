@@ -11,10 +11,10 @@ jobs:
       - uses: dart-lang/setup-dart@v1
       - name: Install dependencies
         run: dart pub get
-        working-directory: flutter/ghost_be
+        working-directory: client-flutter/ghost_be
       - name: Analyze
         run: dart analyze
-        working-directory: flutter/ghost_be
+        working-directory: client-flutter/ghost_be
       - name: Test
         run: dart test
-        working-directory: flutter/ghost_be
+        working-directory: client-flutter/ghost_be
