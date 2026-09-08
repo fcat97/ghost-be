@@ -118,7 +118,7 @@ dependencies:
   ghost_be:
     git:
       url: https://github.com/$owner/$repo
-      path: client-flutter/ghost_be
+      path: client-flutter
       ref: $tag
 ```
 

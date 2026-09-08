@@ -103,7 +103,7 @@ dependencies:
   ghost_be:
     git:
       url: https://github.com/fcat97/ghost-be
-      path: client-flutter/ghost_be
+      path: client-flutter
 ```
 
 Add the interceptor to whichever `Dio` instance your app uses:
@@ -217,7 +217,7 @@ The Kotlin/Native and Android pieces are built with the
 `project.yaml`, no Gradle files to author directly). The iOS and Flutter
 clients are separate, plain packages — a Swift Package (`Package.swift`
 at the repo root, built with `swift build`/`swift test`) and a Dart
-package (`client-flutter/ghost_be/pubspec.yaml`, built with `dart pub get`/
+package (`client-flutter/pubspec.yaml`, built with `dart pub get`/
 `dart test`) respectively — neither involves Kotlin/KMP at all (see the
 [iOS design doc](docs/superpowers/specs/2026-09-07-ios-alamofire-interceptor-design.md#4-architecture-pure-native-swift-no-shared-kotlin-core)
 for why).
@@ -225,8 +225,8 @@ for why).
 | Module | What it is |
 |---|---|
 | [`client-android/`](client-android) | The `GhostBeInterceptor` library (Android) |
-| [`client-ios/GhostBe/`](client-ios/GhostBe) | The iOS client (Swift Package, Alamofire-based — see "Using it in your app" above) |
-| [`client-flutter/ghost_be/`](client-flutter/ghost_be) | The Flutter client (Dart package, dio-based — see "Using it in your app" above) |
+| [`client-ios/`](client-ios) | The iOS client (Swift Package, Alamofire-based — see "Using it in your app" above) |
+| [`client-flutter/`](client-flutter) | The Flutter client (Dart package, dio-based — see "Using it in your app" above) |
 | [`server/`](server) | `ghost-be`'s shared implementation (Kotlin/Native library, `linuxX64` + `mingwX64` + `macosArm64`) |
 | [`server-linux/`](server-linux) | The Linux `ghost-be` executable — thin wrapper around `server/`'s entry point |
 | [`server-windows/`](server-windows) | The Windows `ghost-be` executable — same, cross-compiled for `mingwX64` |

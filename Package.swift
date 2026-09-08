@@ -16,12 +16,12 @@ let package = Package(
             dependencies: [
                 .product(name: "Alamofire", package: "Alamofire")
             ],
-            path: "client-ios/GhostBe/Sources/GhostBe"
+            path: "client-ios/Sources/GhostBe"
         ),
         .testTarget(
             name: "GhostBeTests",
             dependencies: ["GhostBe"],
-            path: "client-ios/GhostBe/Tests/GhostBeTests"
+            path: "client-ios/Tests/GhostBeTests"
         )
     ]
 )
