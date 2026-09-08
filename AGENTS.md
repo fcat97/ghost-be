@@ -68,7 +68,7 @@ the interceptor there, gated so it only compiles into debug builds:
 ```kotlin
 val clientBuilder = OkHttpClient.Builder()
 if (BuildConfig.DEBUG) {
-    clientBuilder.addInterceptor(GhostBeInterceptor(baseUrl = "http://127.0.0.1:8787"))
+    clientBuilder.addInterceptor(GhostBeInterceptor(baseUrl = "http://127.0.0.1:44678"))
 }
 val client = clientBuilder.build()
 ```
@@ -96,7 +96,7 @@ gated to debug builds the same way as Android:
 import GhostBe
 
 #if DEBUG
-let session = GhostBe.session(baseURL: "http://127.0.0.1:8787")
+let session = GhostBe.session(baseURL: "http://127.0.0.1:44678")
 #else
 let session = Session.default
 #endif
@@ -130,7 +130,7 @@ import 'package:ghost_be/ghost_be.dart';
 
 final dio = Dio();
 if (kDebugMode) {
-  dio.interceptors.add(GhostBeInterceptor(baseUrl: 'http://127.0.0.1:8787'));
+  dio.interceptors.add(GhostBeInterceptor(baseUrl: 'http://127.0.0.1:44678'));
 }
 ```
 
@@ -140,9 +140,29 @@ plain dio interceptor with no low-level workaround needed. No download
 step is needed; `dart pub get`/Flutter's build builds the package from
 source.
 
-On a physical device or emulator, make sure port 8787 actually reaches your
-machine — see this repo's README section "Trying the demo end-to-end" for
-the `10.0.2.2` vs `adb reverse` guidance.
+Make sure the target device can actually reach `ghost-be` on port 44678
+before moving on to step 3 — which path applies depends on how you're
+running the app:
+
+- **Emulator:** `127.0.0.1` in the snippets above doesn't reach the host
+  machine from inside the emulator. Either swap `baseUrl`/`baseURL` to
+  `http://10.0.2.2:44678` (Android emulator's host-loopback alias), or keep
+  `127.0.0.1` and run `adb reverse tcp:44678 tcp:44678` once per boot.
+- **Physical device, adb available:** same `adb reverse tcp:44678 tcp:44678`
+  works over USB regardless of platform.
+- **Physical device, no adb** (e.g. a QA tester driving the app over Wi-Fi,
+  no cable, no code access to change anything): start `ghost-be` with
+  `--host 0.0.0.0` so it's reachable on the LAN, then send the tester a deep
+  link/app link carrying the machine's LAN `ip:port` — e.g.
+  `myapp://open?ghostBe=192.168.1.5:44678`. This only works if the target
+  app already hands incoming links to `GhostBe.captureFromIntent`/
+  `captureFromURL`/`captureFromUri` from wherever it receives them (splash
+  screen, launcher `Activity`, `AppDelegate`, or a Flutter deep-link
+  package's callback) — see README.md "Testing on a physical device over
+  Wi-Fi" for the exact hook and why there's no discovery/permission prompt
+  needed. If the target app has no deep-link scheme at all, adding a bare
+  one (it doesn't need to route anywhere real) is the one prerequisite for
+  this path.
 
 ## 3. Create rules for the target project
 
@@ -180,13 +200,20 @@ endpoint speculatively.
 
 ```bash
 # terminal 1: start ghost-be pointed at the rules you just wrote (the
-# binary from step 1 -- ghost-be or ghost-be.exe depending on your OS)
-./ghost-be --port 8787 --rules ./ghost-be-rules
+# binary from step 1 -- ghost-be or ghost-be.exe depending on your OS).
+# Add --host 0.0.0.0 here if you're on the no-adb/LAN path from step 2.
+./ghost-be --port 44678 --rules ./ghost-be-rules
 
 # terminal 2: build and launch the target app on a connected device/emulator
 ./gradlew :app:installDebug
 adb shell am start -n <package>/<launch-activity>
 ```
+
+On the no-adb/LAN path there's no `adb shell am start` to run — install and
+launch the app on the device the same way its own team normally does (a
+direct install, or whatever the project's own run instructions say), then
+tap the deep link carrying `ghostBe=<ip>:<port>` before driving to the
+mocked flow.
 
 Drive the app to the screen/flow that hits the mocked endpoint and confirm
 it shows the behavior the rule encodes (error state, empty state, etc).

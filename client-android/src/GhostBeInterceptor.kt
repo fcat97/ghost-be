@@ -15,10 +15,9 @@ import java.io.IOException
 
 @OptIn(ExperimentalEncodingApi::class)
 class GhostBeInterceptor(
-    baseUrl: String = "http://127.0.0.1:8787"
+    private val baseUrl: String = "http://127.0.0.1:44678"
 ) : Interceptor {
 
-    private val interceptUrl = baseUrl.trimEnd('/') + "/intercept"
     private val relayClient = OkHttpClient()
 
     private companion object {
@@ -41,6 +40,11 @@ class GhostBeInterceptor(
         val requestPayload = envelope.toJson()
         logDebug("-> $requestLabel\nrequest payload: $requestPayload")
 
+        // Re-read the override on every request rather than caching it at construction --
+        // a deep link can arrive any time after the OkHttpClient (and this interceptor)
+        // is already built.
+        val effectiveBaseUrl = GhostBe.overrideBaseUrl ?: baseUrl
+        val interceptUrl = effectiveBaseUrl.trimEnd('/') + "/intercept"
         val relayRequest = Request.Builder()
             .url(interceptUrl)
             .post(requestPayload.toRequestBody("application/json".toMediaType()))

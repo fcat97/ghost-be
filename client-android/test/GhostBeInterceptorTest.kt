@@ -24,6 +24,11 @@ class GhostBeInterceptorTest {
         .addInterceptor(GhostBeInterceptor(baseUrl = baseUrl))
         .build()
 
+    @AfterTest
+    fun clearCapturedServer() {
+        GhostBe.clearCapturedServer()
+    }
+
     @Test
     fun `returns the mocked response when ghost-be intercepts`() {
         ghostBe.start()
@@ -70,5 +75,41 @@ class GhostBeInterceptorTest {
 
         assertEquals("real response", response.body!!.string())
         assertEquals(1, realBackend.requestCount)
+    }
+
+    @Test
+    fun `deep-link captured server overrides the interceptor's configured baseUrl`() {
+        ghostBe.start()
+        ghostBe.enqueue(MockResponse.Builder().code(200).body("""{"intercept":false}""").build())
+        realBackend.start()
+        realBackend.enqueue(MockResponse.Builder().code(200).body("real response").build())
+
+        // Constructed pointing at a dead port -- the deep link is what actually gets used.
+        val client = clientPointedAt("http://127.0.0.1:1")
+        GhostBe.captureFromUriString("myapp://open?ghostBe=${ghostBe.hostName}:${ghostBe.port}")
+
+        val request = Request.Builder().url(realBackend.url("/v1/users/42")).build()
+        val response = client.newCall(request).execute()
+
+        assertEquals("real response", response.body!!.string())
+        assertEquals(1, ghostBe.requestCount)
+    }
+
+    @Test
+    fun `clearCapturedServer falls back to the interceptor's configured baseUrl`() {
+        ghostBe.start()
+        ghostBe.enqueue(MockResponse.Builder().code(200).body("""{"intercept":false}""").build())
+        realBackend.start()
+        realBackend.enqueue(MockResponse.Builder().code(200).body("real response").build())
+
+        GhostBe.captureFromUriString("myapp://open?ghostBe=127.0.0.1:1") // dead port
+        GhostBe.clearCapturedServer()
+
+        val client = clientPointedAt(ghostBe.url("/").toString())
+        val request = Request.Builder().url(realBackend.url("/v1/users/42")).build()
+        val response = client.newCall(request).execute()
+
+        assertEquals("real response", response.body!!.string())
+        assertEquals(1, ghostBe.requestCount)
     }
 }

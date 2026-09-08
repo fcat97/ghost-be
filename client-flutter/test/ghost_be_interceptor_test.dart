@@ -15,6 +15,8 @@ Future<HttpServer> _stub(String responseJson) async {
 }
 
 void main() {
+  tearDown(GhostBe.clearCapturedServer);
+
   test('resolves the mocked response without calling the real backend', () async {
     final ghostBe = await _stub(jsonEncode({
       'intercept': true,
@@ -57,5 +59,49 @@ void main() {
 
     expect(response.statusCode, 200);
     expect(response.data, jsonEncode({'real': 'backend'}));
+  });
+
+  test('deep-link captured server overrides the interceptor\'s configured baseUrl', () async {
+    final ghostBe = await _stub(jsonEncode({
+      'intercept': true,
+      'status': 201,
+      'headers': {'Content-Type': 'application/json'},
+      'body': base64Encode(utf8.encode('{"ok":true}')),
+    }));
+    addTearDown(() => ghostBe.close(force: true));
+
+    // Constructed pointing at a dead port -- the deep link is what actually gets used.
+    final dio = Dio()..interceptors.add(GhostBeInterceptor(baseUrl: 'http://127.0.0.1:1'));
+    GhostBe.captureFromUri(Uri.parse('myapp://open?ghostBe=127.0.0.1:${ghostBe.port}'));
+
+    final response = await dio.get<List<int>>(
+      'http://example.invalid/v1/users/42',
+      options: Options(responseType: ResponseType.bytes),
+    );
+
+    expect(response.statusCode, 201);
+    expect(utf8.decode(response.data!), '{"ok":true}');
+  });
+
+  test('clearCapturedServer falls back to the interceptor\'s configured baseUrl', () async {
+    final ghostBe = await _stub(jsonEncode({
+      'intercept': true,
+      'status': 201,
+      'headers': {'Content-Type': 'application/json'},
+      'body': base64Encode(utf8.encode('{"ok":true}')),
+    }));
+    addTearDown(() => ghostBe.close(force: true));
+
+    GhostBe.captureFromUri(Uri.parse('myapp://open?ghostBe=127.0.0.1:1')); // dead port
+    GhostBe.clearCapturedServer();
+
+    final dio = Dio()..interceptors.add(GhostBeInterceptor(baseUrl: 'http://127.0.0.1:${ghostBe.port}'));
+    final response = await dio.get<List<int>>(
+      'http://example.invalid/v1/users/42',
+      options: Options(responseType: ResponseType.bytes),
+    );
+
+    expect(response.statusCode, 201);
+    expect(utf8.decode(response.data!), '{"ok":true}');
   });
 }

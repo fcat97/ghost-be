@@ -24,13 +24,13 @@ import dev.yellowbytes.ghostbe.client.GhostBeInterceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
-// Requires `adb reverse tcp:3000 tcp:3000` and `adb reverse tcp:8787 tcp:8787`
+// Requires `adb reverse tcp:3000 tcp:3000` and `adb reverse tcp:44678 tcp:44678`
 // so the emulator's own localhost tunnels to demo-backend/ghost-be on the host.
 // (The emulator's usual 10.0.2.2 host-loopback alias can time out on some host
 // firewall configurations even though ICMP/ping succeeds -- adb reverse sidesteps
 // that entirely.)
 private const val BACKEND_URL = "http://127.0.0.1:3000/v1/users/42"
-private const val GHOST_BE_URL = "http://127.0.0.1:8787"
+private const val GHOST_BE_URL = "http://127.0.0.1:44678"
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

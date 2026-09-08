@@ -30,30 +30,34 @@ https://github.com/fcat97/ghost-be
 private const val USAGE = """Usage: ghost-be [options]
 
 Options:
-  --port <port>   Port to listen on (default: 8787)
+  --port <port>   Port to listen on (default: 44678)
   --rules <dir>   Directory of rule .yaml files to watch (default: ./rules)
+  --host <addr>   Address to bind (default: 127.0.0.1; use 0.0.0.0 to allow
+                  connections from other devices on the LAN)
   -h, --help      Show this help and exit
 
 Docs: https://github.com/fcat97/ghost-be#readme"""
 
 private sealed interface ParsedArgs {
     data object Help : ParsedArgs
-    data class Run(val port: Int, val rulesDir: String) : ParsedArgs
+    data class Run(val port: Int, val rulesDir: String, val host: String) : ParsedArgs
 }
 
 private fun parseArgs(args: Array<String>): ParsedArgs {
-    var port = 8787
+    var port = 44678
     var rulesDir = "./rules"
+    var host = "127.0.0.1"
     var i = 0
     while (i < args.size) {
         when (args[i]) {
             "-h", "--help" -> return ParsedArgs.Help
             "--port" -> { port = args[i + 1].toInt(); i += 2 }
             "--rules" -> { rulesDir = args[i + 1]; i += 2 }
+            "--host" -> { host = args[i + 1]; i += 2 }
             else -> { i += 1 }
         }
     }
-    return ParsedArgs.Run(port, rulesDir)
+    return ParsedArgs.Run(port, rulesDir, host)
 }
 
 private fun loadRulesOrExit(rulesDir: Path): List<Rule> {
@@ -77,13 +81,13 @@ fun main(args: Array<String>) {
         println(USAGE)
         return
     }
-    val (port, rulesDirArg) = parsed as ParsedArgs.Run
+    val (port, rulesDirArg, host) = parsed as ParsedArgs.Run
     val rulesDir = rulesDirArg.toPath()
 
     println(BANNER)
     val rulesRef = AtomicReference(loadRulesOrExit(rulesDir))
     println("ghost-be: loaded ${rulesRef.value.size} rule(s) from $rulesDir")
-    println("ghost-be: listening on http://127.0.0.1:$port")
+    println("ghost-be: listening on http://$host:$port")
 
     Worker.start(name = "rule-watcher").execute(TransferMode.SAFE, { rulesDir to rulesRef }) { (dir, ref) ->
         watchRulesDirectory(dir) {
@@ -99,7 +103,7 @@ fun main(args: Array<String>) {
     }
 
     val resolver = ResponseResolver(rulesDir)
-    embeddedServer(CIO, port = port, host = "127.0.0.1") {
+    embeddedServer(CIO, port = port, host = host) {
         routing {
             interceptRoute({ rulesRef.value }, resolver)
         }

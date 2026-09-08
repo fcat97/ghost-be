@@ -45,6 +45,7 @@ final class GhostBeURLProtocolTests: XCTestCase {
     override func tearDownWithError() throws {
         stubProcesses.forEach { $0.terminate() }
         stubProcesses = []
+        GhostBe.clearCapturedServer()
     }
 
     func testReturnsTheMockedResponseInsteadOfCallingTheRealBackend() throws {
@@ -81,6 +82,42 @@ final class GhostBeURLProtocolTests: XCTestCase {
             .responseData { response in
                 XCTAssertEqual(response.response?.statusCode, 200)
                 XCTAssertEqual(response.data, Data(#"{"real":"backend"}"#.utf8))
+                expectation.fulfill()
+            }
+
+        wait(for: [expectation], timeout: 5)
+    }
+
+    func testCaptureFromURLOverridesTheConfiguredBaseURL() throws {
+        try launchStub(port: 18793, responseJSON: #"{"intercept":true,"status":201,"headers":{},"body":"eyJvayI6dHJ1ZX0="}"#)
+
+        // Constructed pointing at a dead port -- the deep link is what actually gets used.
+        let session = GhostBe.session(baseURL: "http://127.0.0.1:1")
+        GhostBe.captureFromURL(URL(string: "myapp://open?ghostBe=127.0.0.1:18793")!)
+        let expectation = expectation(description: "response received")
+
+        session.request("http://example.invalid/v1/users/42")
+            .validate()
+            .responseData { response in
+                XCTAssertEqual(response.response?.statusCode, 201)
+                expectation.fulfill()
+            }
+
+        wait(for: [expectation], timeout: 5)
+    }
+
+    func testClearCapturedServerFallsBackToTheConfiguredBaseURL() throws {
+        try launchStub(port: 18794, responseJSON: #"{"intercept":true,"status":201,"headers":{},"body":"eyJvayI6dHJ1ZX0="}"#)
+
+        let session = GhostBe.session(baseURL: "http://127.0.0.1:18794")
+        GhostBe.captureFromURL(URL(string: "myapp://open?ghostBe=127.0.0.1:1")!) // dead port
+        GhostBe.clearCapturedServer()
+        let expectation = expectation(description: "response received")
+
+        session.request("http://example.invalid/v1/users/42")
+            .validate()
+            .responseData { response in
+                XCTAssertEqual(response.response?.statusCode, 201)
                 expectation.fulfill()
             }
 

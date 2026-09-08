@@ -1,12 +1,13 @@
 import 'dart:convert';
 import 'package:dio/dio.dart';
 import 'envelope.dart';
+import 'ghost_be.dart';
 
 class GhostBeInterceptor extends Interceptor {
   final String baseUrl;
   final Dio _relayClient = Dio();
 
-  GhostBeInterceptor({this.baseUrl = 'http://127.0.0.1:8787'});
+  GhostBeInterceptor({this.baseUrl = 'http://127.0.0.1:44678'});
 
   @override
   Future<void> onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
@@ -18,10 +19,14 @@ class GhostBeInterceptor extends Interceptor {
       body: bodyBytes != null ? base64Encode(bodyBytes) : null,
     );
 
+    // Re-read the override on every request rather than caching it at construction --
+    // a deep link can arrive any time after this interceptor is already built.
+    final effectiveBaseUrl = GhostBe.overrideBaseUrl ?? baseUrl;
+
     final ResponseEnvelope decision;
     try {
       final relayResponse = await _relayClient.post<Map<String, dynamic>>(
-        '${baseUrl.replaceAll(RegExp(r"/+$"), "")}/intercept',
+        '${effectiveBaseUrl.replaceAll(RegExp(r"/+$"), "")}/intercept',
         data: envelope.toJson(),
         options: Options(contentType: 'application/json', responseType: ResponseType.json),
       );

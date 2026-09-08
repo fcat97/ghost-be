@@ -2,7 +2,10 @@ import Foundation
 
 final class GhostBeURLProtocol: URLProtocol {
     private var relayedTask: URLSessionDataTask?
-    static var baseURL = "http://127.0.0.1:8787"
+    static var baseURL = "http://127.0.0.1:44678"
+    // Set by GhostBe.captureFromURL when a deep link carries a `ghostBe=ip:port`
+    // query param -- takes priority over `baseURL` for the rest of this process's life.
+    static var overrideBaseURL: String?
 
     override class func canInit(with request: URLRequest) -> Bool { true }
     override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
@@ -19,7 +22,8 @@ final class GhostBeURLProtocol: URLProtocol {
             body: request.httpBody?.base64EncodedString()
         )
 
-        let baseURL = Self.baseURL.hasSuffix("/") ? String(Self.baseURL.dropLast()) : Self.baseURL
+        let configuredBaseURL = Self.overrideBaseURL ?? Self.baseURL
+        let baseURL = configuredBaseURL.hasSuffix("/") ? String(configuredBaseURL.dropLast()) : configuredBaseURL
         var relayRequest = URLRequest(url: URL(string: baseURL + "/intercept")!)
         relayRequest.httpMethod = "POST"
         relayRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")

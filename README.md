@@ -61,7 +61,7 @@ request:
 
 ```kotlin
 val client = OkHttpClient.Builder()
-    .addInterceptor(GhostBeInterceptor(baseUrl = "http://127.0.0.1:8787"))
+    .addInterceptor(GhostBeInterceptor(baseUrl = "http://127.0.0.1:44678"))
     .build()
 ```
 
@@ -81,7 +81,7 @@ about every request:
 ```swift
 import GhostBe
 
-let session = GhostBe.session() // defaults to http://127.0.0.1:8787
+let session = GhostBe.session() // defaults to http://127.0.0.1:44678
 session.request("https://api.example.com/v1/users/42")
     .responseDecodable(of: User.self) { response in
         // ...
@@ -112,7 +112,7 @@ Add the interceptor to whichever `Dio` instance your app uses:
 import 'package:dio/dio.dart';
 import 'package:ghost_be/ghost_be.dart';
 
-final dio = Dio()..interceptors.add(GhostBeInterceptor(baseUrl: 'http://127.0.0.1:8787'));
+final dio = Dio()..interceptors.add(GhostBeInterceptor(baseUrl: 'http://127.0.0.1:44678'));
 ```
 
 Unlike Alamofire's `RequestInterceptor`, dio's `Interceptor.onRequest` can
@@ -123,16 +123,67 @@ the Android client.
 That's it on the app side. Everything else is configuring and running
 `ghost-be`.
 
+### Testing on a physical device over Wi-Fi
+
+The examples above assume the app and `ghost-be` are reachable at
+`127.0.0.1` — true on a simulator/emulator, or a physical device tunneled
+over `adb reverse`. A QA tester driving the app over Wi-Fi with no cable
+and no code access has neither, so all three clients accept a deep
+link/app link instead of a hardcoded `baseUrl`:
+
+1. Start `ghost-be` with `--host 0.0.0.0` so it's reachable from other
+   devices on the LAN, and note the machine's LAN IP (`ipconfig getifaddr en0`
+   on macOS, `hostname -I` on Linux).
+2. Send the tester a link like `myapp://open?ghostBe=192.168.1.5:44678`
+   (whatever URL scheme/host the app already handles) — any channel works:
+   Slack, a QR code, a text message.
+3. The tester taps the link, then uses the app normally. Every request for
+   the rest of that run is relayed to the `ghostBe` address instead of the
+   client's configured default — there's no discovery, no permission
+   prompt, and nothing to persist, since the app being killed is exactly
+   when a QA session naturally ends too.
+
+This only works if the app already hands incoming links to `GhostBe` —
+wire it into whichever screen/method the app uses to receive deep links
+(splash screen, launcher `Activity`, `AppDelegate`/`SceneDelegate`, or a
+Flutter deep-link package's callback):
+
+```kotlin
+// Android: an Activity's onCreate/onNewIntent
+override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+    GhostBe.captureFromIntent(intent)
+}
+```
+
+```swift
+// iOS: UIApplicationDelegate
+func application(_ app: UIApplication, open url: URL, options: ...) -> Bool {
+    GhostBe.captureFromURL(url)
+    return true
+}
+```
+
+```dart
+// Flutter: wherever the app already listens for incoming links
+final appLinks = AppLinks();
+appLinks.uriLinkStream.listen(GhostBe.captureFromUri);
+```
+
+If the app doesn't have a deep-link scheme set up at all, this is the one
+thing that needs adding to the target project for this workflow — a
+single scheme/host is enough, it doesn't need to route anywhere real.
+
 ## Running ghost-be
 
 `ghost-be` is a small command-line server you run on your machine (or a CI
 runner) alongside the app you're testing:
 
 ```bash
-ghost-be --port 8787 --rules ./rules
+ghost-be --port 44678 --rules ./rules
 ```
 
-Both flags are optional (`8787` and `./rules` are the defaults).
+Both flags are optional (`44678` and `./rules` are the defaults).
 
 ### Writing rules
 
@@ -248,7 +299,7 @@ export ANDROID_HOME=/path/to/Android/Sdk
 ./kotlin build                     # build every module
 ./kotlin test                       # run every module's tests
 ./kotlin build -m server-linux       # build/test just one module
-./kotlin run -m server-linux -- --rules ./rules --port 8787
+./kotlin run -m server-linux -- --rules ./rules --port 44678
 ```
 
 ### Trying the demo end-to-end
@@ -267,7 +318,7 @@ pick it up, publish it locally first:
 node demo-backend/server.js
 
 # 2. Start ghost-be with a rules dir of your own (see "Writing rules" above)
-./kotlin run -m server-linux -- --rules ./demo-rules --port 8787
+./kotlin run -m server-linux -- --rules ./demo-rules --port 44678
 
 # 3. Install and launch demo-app on a connected device/emulator
 export ANDROID_SERIAL=emulator-5554   # if more than one device is attached
@@ -281,7 +332,7 @@ tunneling through adb instead:
 
 ```bash
 adb reverse tcp:3000 tcp:3000
-adb reverse tcp:8787 tcp:8787
+adb reverse tcp:44678 tcp:44678
 ```
 
 (demo-app is wired to `127.0.0.1`, which these mappings redirect to the
