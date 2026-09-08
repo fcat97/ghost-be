@@ -11,8 +11,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 
 @Composable
-fun RulesPane(state: AppState) {
-    Column(modifier = Modifier.fillMaxWidth()) {
+fun RulesPane(state: AppState, modifier: Modifier = Modifier) {
+    Column(modifier = modifier) {
         Button(onClick = { state.startCreating() }) { Text("New rule") }
 
         LazyColumn {

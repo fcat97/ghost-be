@@ -193,6 +193,16 @@ ghost-be --port 44678 --rules ./rules
 
 Both flags are optional (`44678` and `./rules` are the defaults).
 
+### Web backoffice
+
+Once you've built the `web-backoffice` module (`./kotlin build -m web-backoffice -v release`),
+`ghost-be` serves it automatically at `http://<host>:<port>/` alongside
+`/intercept` — no separate process. It's a two-pane UI: a rules list (view,
+create, edit raw YAML, toggle on/off, delete) next to a live traffic feed
+of every request `/intercept` sees, with a "Create rule from this" action
+on any matched-traffic row. `--web-dist <dir>` points ghost-be at a
+different build output if you're not using the default path.
+
 ### Writing rules
 
 Rules live in YAML files under your rules directory. Each rule says which

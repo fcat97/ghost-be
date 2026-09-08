@@ -3,6 +3,16 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
+import org.w3c.dom.EventSource
+import kotlin.js.ExperimentalWasmJsInterop
+
+@Serializable
+data class TrafficEvent(val method: String, val url: String, val ruleMatched: String?, val status: Int?)
+
+private val trafficJson = Json { ignoreUnknownKeys = true }
 
 class AppState(private val scope: CoroutineScope) {
     var rules by mutableStateOf<List<RuleFileSummary>>(emptyList())
@@ -66,5 +76,30 @@ class AppState(private val scope: CoroutineScope) {
             ApiClient.toggleRule(path, ruleName)
             refreshRules()
         }
+    }
+
+    var traffic by mutableStateOf<List<TrafficEvent>>(emptyList())
+        private set
+
+    @OptIn(ExperimentalWasmJsInterop::class)
+    fun connectTrafficFeed() {
+        val source = EventSource("/events/traffic")
+        source.onmessage = { messageEvent ->
+            val event = trafficJson.decodeFromString<TrafficEvent>(messageEvent.data.toString())
+            traffic = (traffic + event).takeLast(500)
+            null
+        }
+    }
+
+    fun createRuleFromTraffic(event: TrafficEvent) {
+        startCreating(
+            prefillContent = "rules:\n  - name: new-rule\n    match: { method: ${event.method}, path: ${pathOf(event.url)} }\n    response: { file: responses/new.json, status: 200 }\n"
+        )
+    }
+
+    private fun pathOf(url: String): String {
+        val withoutScheme = url.substringAfter("://")
+        val afterHost = withoutScheme.substringAfter('/', missingDelimiterValue = "")
+        return "/" + afterHost.substringBefore('?')
     }
 }
