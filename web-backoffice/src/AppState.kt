@@ -22,6 +22,10 @@ class AppState(private val scope: CoroutineScope) {
     var editingContent by mutableStateOf("")
     var editingIsNew by mutableStateOf(false)
     var editingError by mutableStateOf<String?>(null)
+    var validationMessage by mutableStateOf<String?>(null)
+        private set
+    var validationOk by mutableStateOf(false)
+        private set
 
     fun refreshRules() {
         scope.launch {
@@ -34,6 +38,7 @@ class AppState(private val scope: CoroutineScope) {
         editingContent = content
         editingIsNew = false
         editingError = null
+        validationMessage = null
     }
 
     fun startCreating(prefillContent: String = "") {
@@ -41,6 +46,7 @@ class AppState(private val scope: CoroutineScope) {
         editingContent = prefillContent
         editingIsNew = true
         editingError = null
+        validationMessage = null
     }
 
     fun cancelEditing() {
@@ -56,8 +62,9 @@ class AppState(private val scope: CoroutineScope) {
                 } else {
                     ApiClient.saveRule(path, editingContent)
                 }
-                editingPath = null
-                refreshRules()
+                editingIsNew = false
+                rules = ApiClient.listRules()
+                rules.firstOrNull { it.path == path }?.let { editingContent = it.content }
             } catch (e: Throwable) {
                 editingError = e.message ?: "save failed"
             }
@@ -66,15 +73,31 @@ class AppState(private val scope: CoroutineScope) {
 
     fun deleteRuleFile(path: String) {
         scope.launch {
-            ApiClient.deleteRule(path)
-            refreshRules()
+            try {
+                ApiClient.deleteRule(path)
+                refreshRules()
+            } catch (e: Throwable) {
+                editingError = e.message ?: "delete failed"
+            }
         }
     }
 
     fun toggleRule(path: String, ruleName: String) {
         scope.launch {
-            ApiClient.toggleRule(path, ruleName)
-            refreshRules()
+            try {
+                ApiClient.toggleRule(path, ruleName)
+                refreshRules()
+            } catch (e: Throwable) {
+                editingError = e.message ?: "toggle failed"
+            }
+        }
+    }
+
+    fun validateEditing() {
+        scope.launch {
+            val error = ApiClient.validateRule(editingContent)
+            validationOk = error == null
+            validationMessage = error ?: "Valid YAML"
         }
     }
 
@@ -95,6 +118,10 @@ class AppState(private val scope: CoroutineScope) {
         startCreating(
             prefillContent = "rules:\n  - name: new-rule\n    match: { method: ${event.method}, path: ${pathOf(event.url)} }\n    response: { file: responses/new.json, status: 200 }\n"
         )
+    }
+
+    fun clearTraffic() {
+        traffic = emptyList()
     }
 
     private fun pathOf(url: String): String {

@@ -35,6 +35,23 @@ class RulesApiRouteTest {
     }
 
     @Test
+    fun `validates well-formed yaml without writing any file`() = testApp { client ->
+        val response = client.post("/api/rules/validate") {
+            setBody("rules:\n  - name: ok\n    match: { method: GET, path: /v1/x }\n    response: { file: r.json, status: 200 }\n")
+        }
+        assertEquals(HttpStatusCode.OK, response.status)
+    }
+
+    @Test
+    fun `rejects malformed yaml on validate without writing any file`() = testApp { client ->
+        val response = client.post("/api/rules/validate") {
+            setBody("rules: [this is not: valid: yaml structure")
+        }
+        assertEquals(HttpStatusCode.BadRequest, response.status)
+        assertTrue(response.bodyAsText().isNotBlank())
+    }
+
+    @Test
     fun `creates a new rule file`() = testApp { client ->
         val response = client.post("/api/rules") {
             contentType(ContentType.Application.Json)

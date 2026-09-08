@@ -1,4 +1,7 @@
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -16,9 +19,15 @@ fun App() {
         state.connectTrafficFeed()
         true
     }
-    Row {
-        RulesPane(state, modifier = Modifier.weight(1f))
-        TrafficPane(state, modifier = Modifier.weight(1f))
+    Column(modifier = Modifier.fillMaxSize().background(Palette.bgPrimary)) {
+        HeaderBar()
+        Column(modifier = Modifier.weight(1f)) {
+            Row(modifier = Modifier.weight(0.55f)) {
+                RulesPane(state, modifier = Modifier.weight(0.45f))
+                RuleEditorPane(state, modifier = Modifier.weight(0.55f))
+            }
+            TrafficPane(state, modifier = Modifier.weight(0.45f))
+        }
     }
 }
 

@@ -78,6 +78,16 @@ fun Route.rulesApiRoute(rulesDir: Path, fileSystem: FileSystem = FileSystem.SYST
         call.respondText("ok", ContentType.Text.Plain, HttpStatusCode.OK)
     }
 
+    post("/api/rules/validate") {
+        val content = call.receiveText()
+        try {
+            loadRuleFile(content)
+            call.respondText("ok", ContentType.Text.Plain, HttpStatusCode.OK)
+        } catch (e: IllegalArgumentException) {
+            call.respondText(e.message ?: "invalid rule YAML", ContentType.Text.Plain, HttpStatusCode.BadRequest)
+        }
+    }
+
     post("/api/rules") {
         val request = json.decodeFromString<CreateRuleFileRequest>(call.receiveText())
         val resolved = resolveRuleFilePath(rulesDir, request.path)
