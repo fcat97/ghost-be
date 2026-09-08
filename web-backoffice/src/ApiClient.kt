@@ -1,12 +1,10 @@
-import kotlinx.browser.window
-import kotlinx.coroutines.await
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
-import org.w3c.fetch.RequestInit
-import org.w3c.fetch.Response
-import kotlin.js.ExperimentalWasmJsInterop
+import org.w3c.xhr.XMLHttpRequest
+import kotlin.coroutines.resume
 
 @Serializable
 data class RuleSummary(val name: String, val method: String, val path: String, val enabled: Boolean)
@@ -19,17 +17,28 @@ private data class CreateRuleFileRequest(val path: String, val content: String)
 
 private val json = Json { ignoreUnknownKeys = true }
 
-@OptIn(ExperimentalWasmJsInterop::class)
-private suspend fun request(method: String, url: String, body: String? = null): Response {
-    val init = if (body != null) RequestInit(method = method, body = body.toJsString()) else RequestInit(method = method)
-    return window.fetch(url, init).await<Response>()
+private suspend fun request(method: String, url: String, body: String? = null): String {
+    return suspendCancellableCoroutine { continuation ->
+        val xhr = XMLHttpRequest()
+        xhr.open(method, url)
+        xhr.onload = {
+            continuation.resume(xhr.responseText)
+        }
+        xhr.onerror = {
+            continuation.resume("")
+        }
+        if (body != null) {
+            xhr.setRequestHeader("Content-Type", "application/json")
+            xhr.send(body)
+        } else {
+            xhr.send()
+        }
+    }
 }
 
 object ApiClient {
-    @OptIn(ExperimentalWasmJsInterop::class)
     suspend fun listRules(): List<RuleFileSummary> {
-        val response = request("GET", "/api/rules")
-        val text = response.text().await<JsString>().toString()
+        val text = request("GET", "/api/rules")
         return json.decodeFromString(text)
     }
 

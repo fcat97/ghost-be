@@ -1,12 +1,19 @@
-import androidx.compose.material3.Text
+import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.window.ComposeViewport
 import kotlinx.browser.document
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 
 @Composable
 fun App() {
-    Text("ghost-be backoffice")
+    val state = remember { AppState(CoroutineScope(Dispatchers.Default)) }
+    remember { state.refreshRules(); true }
+    Column {
+        RulesPane(state)
+    }
 }
 
 @OptIn(ExperimentalComposeUiApi::class)
