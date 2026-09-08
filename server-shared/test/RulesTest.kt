@@ -71,6 +71,14 @@ class RulesTest {
     }
 
     @Test
+    fun `round-trips a parsed rule file back to equivalent yaml`() {
+        val original = loadRuleFile(fixture)
+        val rendered = renderRuleFile(original)
+        val reparsed = loadRuleFile(rendered)
+        assertEquals(original, reparsed)
+    }
+
+    @Test
     fun `throws with a clear message on malformed yaml`() {
         val error = assertFailsWith<IllegalArgumentException> {
             loadRuleFile("rules: [this is not: valid: yaml structure")

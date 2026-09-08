@@ -41,6 +41,10 @@ fun loadRuleFile(yaml: String): RuleFile {
     }
 }
 
+fun renderRuleFile(ruleFile: RuleFile): String {
+    return Yaml.default.encodeToString(RuleFile.serializer(), ruleFile)
+}
+
 fun loadRulesFromDirectory(dir: Path, fileSystem: FileSystem = FileSystem.SYSTEM): List<Rule> {
     val files = fileSystem.list(dir)
         .filter { it.name.endsWith(".yaml") || it.name.endsWith(".yml") }
