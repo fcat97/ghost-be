@@ -25,7 +25,7 @@ fun matchRule(envelope: RequestEnvelope, rules: List<Rule>): Rule? {
     val (path, query) = parseUrl(envelope.url)
     val lowerCaseHeaders = envelope.headers.mapKeys { it.key.lowercase() }
 
-    return rules.firstOrNull { rule ->
+    return rules.filter { it.enabled }.firstOrNull { rule ->
         val match = rule.match
         if (!match.method.equals(envelope.method, ignoreCase = true)) return@firstOrNull false
 

@@ -26,7 +26,8 @@ data class ResponseSpec(
 data class Rule(
     val name: String,
     val match: MatchSpec,
-    val response: ResponseSpec
+    val response: ResponseSpec,
+    val enabled: Boolean = true
 )
 
 @Serializable

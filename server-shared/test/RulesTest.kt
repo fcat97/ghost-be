@@ -52,6 +52,25 @@ class RulesTest {
     }
 
     @Test
+    fun `defaults enabled to true when the key is absent`() {
+        val rule = loadRuleFile(fixture).rules[0]
+        assertEquals(true, rule.enabled)
+    }
+
+    @Test
+    fun `parses an explicit enabled false`() {
+        val fixtureDisabled = """
+            rules:
+              - name: get-user-42
+                match: { method: GET, path: /v1/users/42 }
+                response: { file: responses/user-42.json, status: 200 }
+                enabled: false
+        """.trimIndent()
+        val rule = loadRuleFile(fixtureDisabled).rules[0]
+        assertEquals(false, rule.enabled)
+    }
+
+    @Test
     fun `throws with a clear message on malformed yaml`() {
         val error = assertFailsWith<IllegalArgumentException> {
             loadRuleFile("rules: [this is not: valid: yaml structure")

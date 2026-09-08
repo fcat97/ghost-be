@@ -6,8 +6,9 @@ import kotlin.test.assertNull
 
 class MatcherTest {
     private fun rule(name: String, method: String, path: String? = null, pathPattern: String? = null,
-                      query: Map<String, String> = emptyMap(), headers: Map<String, String> = emptyMap()) =
-        Rule(name, MatchSpec(method, path, pathPattern, query, headers), ResponseSpec(status = 200))
+                      query: Map<String, String> = emptyMap(), headers: Map<String, String> = emptyMap(),
+                      enabled: Boolean = true) =
+        Rule(name, MatchSpec(method, path, pathPattern, query, headers), ResponseSpec(status = 200), enabled)
 
     private fun envelope(method: String, url: String, headers: Map<String, String> = emptyMap()) =
         RequestEnvelope(method, url, headers, null)
@@ -70,5 +71,14 @@ class MatcherTest {
     @Test
     fun `returns null when nothing matches`() {
         assertNull(matchRule(envelope("GET", "https://api.example.com/v1/other"), emptyList()))
+    }
+
+    @Test
+    fun `skips a disabled rule even if it would otherwise match`() {
+        val rules = listOf(
+            rule("disabled-one", "GET", path = "/v1/users/42", enabled = false),
+            rule("enabled-one", "GET", path = "/v1/users/42")
+        )
+        assertEquals("enabled-one", matchRule(envelope("GET", "https://api.example.com/v1/users/42"), rules)?.name)
     }
 }
