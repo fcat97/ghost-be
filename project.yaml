@@ -1,7 +1,7 @@
 modules:
   - client-android
   - demo-app
-  - server
   - server-linux
   - server-macos
+  - server-shared
   - server-windows

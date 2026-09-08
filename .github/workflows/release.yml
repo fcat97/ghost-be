@@ -16,7 +16,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run server library tests
-        run: ./kotlin test -m server
+        run: ./kotlin test -m server-shared
 
       - name: Build ghost-be Linux release binary
         run: ./kotlin build -m server-linux -v release
@@ -51,7 +51,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run server library tests (includes macOS-specific Process/RuleWatcher tests)
-        run: ./kotlin test -m server
+        run: ./kotlin test -m server-shared
 
       - name: Build ghost-be macOS release binary
         run: ./kotlin build -m server-macos -v release

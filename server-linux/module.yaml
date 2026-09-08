@@ -3,7 +3,7 @@ product:
   platforms: [ linuxX64 ]
 
 dependencies:
-  - //server
+  - //server-shared
 
 settings:
   native:

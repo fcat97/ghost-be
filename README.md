@@ -227,8 +227,8 @@ for why).
 | [`client-android/`](client-android) | The `GhostBeInterceptor` library (Android) |
 | [`client-ios/`](client-ios) | The iOS client (Swift Package, Alamofire-based — see "Using it in your app" above) |
 | [`client-flutter/`](client-flutter) | The Flutter client (Dart package, dio-based — see "Using it in your app" above) |
-| [`server/`](server) | `ghost-be`'s shared implementation (Kotlin/Native library, `linuxX64` + `mingwX64` + `macosArm64`) |
-| [`server-linux/`](server-linux) | The Linux `ghost-be` executable — thin wrapper around `server/`'s entry point |
+| [`server-shared/`](server-shared) | `ghost-be`'s shared implementation (Kotlin/Native library, `linuxX64` + `mingwX64` + `macosArm64`) |
+| [`server-linux/`](server-linux) | The Linux `ghost-be` executable — thin wrapper around `server-shared/`'s entry point |
 | [`server-windows/`](server-windows) | The Windows `ghost-be` executable — same, cross-compiled for `mingwX64` |
 | [`server-macos/`](server-macos) | The macOS (Apple Silicon) `ghost-be` executable — same, for `macosArm64` |
 | [`demo-app/`](demo-app) | A minimal Compose app for manually exercising `client-android/` (consumes it from local Maven, not as a project dependency — see below) |
