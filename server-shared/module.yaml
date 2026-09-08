@@ -6,6 +6,7 @@ dependencies:
   - $ktor.server.core
   - $ktor.server.cio
   - com.charleskorn.kaml:kaml:0.61.0
+  - org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0
 
 test-dependencies:
   - $ktor.server.testHost
