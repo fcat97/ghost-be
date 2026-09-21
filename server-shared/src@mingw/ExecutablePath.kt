@@ -17,5 +17,5 @@ actual fun executableDir(): Path? = memScoped {
     if (length == 0u) return@memScoped null
 
     val chars = CharArray(length.toInt()) { i -> buffer[i].toInt().toChar() }
-    String(chars).toPath().parent
+    chars.concatToString().toPath().parent
 }

@@ -18,7 +18,7 @@ import platform.posix.realpath
  */
 @OptIn(ExperimentalForeignApi::class)
 actual fun executableDir(): Path? {
-    val argv0 = NSProcessInfo.processInfo.arguments.firstOrNull() ?: return null
+    val argv0 = NSProcessInfo.processInfo.arguments.firstOrNull() as? String ?: return null
     val resolved = realpath(argv0, null) ?: return null
     val path = resolved.toKString()
     free(resolved)
