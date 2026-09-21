@@ -195,13 +195,20 @@ Both flags are optional (`44678` and `./rules` are the defaults).
 
 ### Web backoffice
 
-Once you've built the `web-backoffice` module (`./kotlin build -m web-backoffice -v release`),
-`ghost-be` serves it automatically at `http://<host>:<port>/` alongside
-`/intercept` — no separate process. It's a two-pane UI: a rules list (view,
-create, edit raw YAML, toggle on/off, delete) next to a live traffic feed
-of every request `/intercept` sees, with a "Create rule from this" action
-on any matched-traffic row. `--web-dist <dir>` points ghost-be at a
-different build output if you're not using the default path.
+`ghost-be` serves a web UI automatically at `http://<host>:<port>/`
+alongside `/intercept` — no separate process. It's a two-pane UI: a rules
+list (view, create, edit raw YAML, toggle on/off, delete) next to a live
+traffic feed of every request `/intercept` sees, with a "Create rule from
+this" action on any matched-traffic row.
+
+The downloadable release archives (see "Installing a release" below)
+bundle this UI's built assets in a `web-backoffice/` folder next to the
+`ghost-be` binary, and it's found automatically by the binary's own
+location on disk — no build step, no flags, works regardless of your
+current working directory. If you're building `ghost-be` from source
+instead, build the UI first (`./kotlin build -m web-backoffice -v
+release`) and either keep the default relative dev path or point
+`--web-dist <dir>` at wherever you built it.
 
 ### Writing rules
 
@@ -268,12 +275,14 @@ comments document the contract, and it's a real script you can run.
 
 ## Project status
 
-Tagged releases (`v*`) attach a prebuilt `ghost-be` binary for Linux
-(`ghost-be-linux-x64`), Windows (`ghost-be-windows-x64.exe`), and macOS
-Apple Silicon (`ghost-be-macos-arm64`), plus the `client` library's
-`.aar`, to the corresponding [GitHub Release](../../releases) (see
-"Using it in your app" above) — no build-from-source needed for any of
-them. Neither the iOS nor the Flutter package has a release artifact of
+Tagged releases (`v*`) attach a prebuilt `ghost-be` archive for Linux
+(`ghost-be-linux-x64.tar.gz`), Windows (`ghost-be-windows-x64.zip`), and
+macOS Apple Silicon (`ghost-be-macos-arm64.tar.gz`), plus the `client`
+library's `.aar`, to the corresponding [GitHub Release](../../releases)
+(see "Using it in your app" above) — no build-from-source needed for any
+of them. Each archive bundles the server binary together with the
+web-backoffice UI's built assets, in a `web-backoffice/` folder next to
+the binary, so extracting the archive is the only setup step. Neither the iOS nor the Flutter package has a release artifact of
 its own — Swift Package Manager and `pub` both resolve straight from this
 repo's `vX.Y.Z` git tags, and Xcode/`dart pub get` build from source. If
 you're working from an untagged commit, or want to build any piece

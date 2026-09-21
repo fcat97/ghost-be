@@ -11,8 +11,9 @@ format — this file only adds the step-by-step workflow.
 ## 1. Install the `ghost-be` binary from GitHub
 
 `ghost-be` releases are tagged `v*` on GitHub and each attaches a prebuilt
-binary for Linux, Windows, and macOS (Apple Silicon). Fetch the one for
-your own OS:
+archive for Linux, Windows, and macOS (Apple Silicon). Each archive bundles
+the server binary together with the web-backoffice UI it serves, so no
+separate UI build step is needed. Fetch and extract the one for your own OS:
 
 ```bash
 owner=fcat97
@@ -20,19 +21,30 @@ repo=ghost-be
 tag=$(curl -fsS "https://api.github.com/repos/$owner/$repo/releases/latest" | jq -r .tag_name)
 
 case "$(uname -s)" in
-  Linux)  asset=ghost-be-linux-x64;       out=ghost-be ;;
-  Darwin) asset=ghost-be-macos-arm64;     out=ghost-be ;;
-  *)      asset=ghost-be-windows-x64.exe; out=ghost-be.exe ;;
+  Linux)  asset=ghost-be-linux-x64.tar.gz;   out=ghost-be ;;
+  Darwin) asset=ghost-be-macos-arm64.tar.gz; out=ghost-be ;;
+  *)      asset=ghost-be-windows-x64.zip;    out=ghost-be.exe ;;
 esac
 
-curl -fsSL -o "$out" "https://github.com/$owner/$repo/releases/download/$tag/$asset"
-chmod +x "$out"
+mkdir -p tools/ghost-be
+curl -fsSL -o "/tmp/$asset" "https://github.com/$owner/$repo/releases/download/$tag/$asset"
+case "$asset" in
+  *.tar.gz) tar xzf "/tmp/$asset" -C tools/ghost-be ;;
+  *.zip)    unzip -o "/tmp/$asset" -d tools/ghost-be ;;
+esac
+chmod +x "tools/ghost-be/$out"
 ```
 
-Verify it runs: `./$out --help` or just start it (see step 3) and check
-for the "listening on" log line. Keep the binary somewhere durable in the
-target project (e.g. `tools/$out`) rather than a temp dir, since you'll
-restart it repeatedly while iterating.
+Each archive extracts to a binary (`ghost-be`/`ghost-be.exe`) sitting next
+to a `web-backoffice/` folder — keep them together; `ghost-be` finds the
+UI folder by its own location on disk, not by the current working
+directory, so it's fine to `cd` elsewhere before running it, but don't
+copy the binary out of `tools/ghost-be/` on its own.
+
+Verify it runs: `tools/ghost-be/$out --help` or just start it (see step 3)
+and check for the "listening on" log line. Keep the extracted directory
+somewhere durable in the target project (e.g. `tools/ghost-be/`) rather
+than a temp dir, since you'll restart it repeatedly while iterating.
 
 ## 2. Integrate the client interceptor into the target app
 
@@ -201,8 +213,10 @@ endpoint speculatively.
 ```bash
 # terminal 1: start ghost-be pointed at the rules you just wrote (the
 # binary from step 1 -- ghost-be or ghost-be.exe depending on your OS).
+# It serves the web-backoffice UI itself at http://127.0.0.1:44678, since
+# it was extracted next to the binary in step 1 -- no separate step needed.
 # Add --host 0.0.0.0 here if you're on the no-adb/LAN path from step 2.
-./ghost-be --port 44678 --rules ./ghost-be-rules
+tools/ghost-be/ghost-be --port 44678 --rules ./ghost-be-rules
 
 # terminal 2: build and launch the target app on a connected device/emulator
 ./gradlew :app:installDebug

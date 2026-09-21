@@ -18,17 +18,30 @@ jobs:
       - name: Run server library tests
         run: ./kotlin test -m server-shared
 
+      - name: Build web-backoffice release bundle
+        run: ./kotlin build -m web-backoffice -v release
+
       - name: Build ghost-be Linux release binary
         run: ./kotlin build -m server-linux -v release
 
-      - name: Stage Linux release binary
-        run: cp build/tasks/_server-linux_linkLinuxX64Release/server-linux.kexe ghost-be-linux-x64
+      - name: Stage Linux release archive
+        run: |
+          staging=ghost-be-linux-x64
+          mkdir -p "$staging/web-backoffice"
+          cp build/tasks/_server-linux_linkLinuxX64Release/server-linux.kexe "$staging/ghost-be"
+          cp -r web-backoffice/build/tasks/_web-backoffice_buildWasmJsAppWasmJsRelease/. "$staging/web-backoffice"
+          tar czf ghost-be-linux-x64.tar.gz -C "$staging" .
 
       - name: Build ghost-be Windows release binary
         run: ./kotlin build -m server-windows -v release
 
-      - name: Stage Windows release binary
-        run: cp build/tasks/_server-windows_linkMingwX64Release/server-windows.exe ghost-be-windows-x64.exe
+      - name: Stage Windows release archive
+        run: |
+          staging=ghost-be-windows-x64
+          mkdir -p "$staging/web-backoffice"
+          cp build/tasks/_server-windows_linkMingwX64Release/server-windows.exe "$staging/ghost-be.exe"
+          cp -r web-backoffice/build/tasks/_web-backoffice_buildWasmJsAppWasmJsRelease/. "$staging/web-backoffice"
+          (cd "$staging" && zip -r "../ghost-be-windows-x64.zip" .)
 
       - name: Build client release AAR
         run: ./kotlin build -m client-android -v release
@@ -40,8 +53,8 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            ghost-be-linux-x64
-            ghost-be-windows-x64.exe
+            ghost-be-linux-x64.tar.gz
+            ghost-be-windows-x64.zip
             ghost-be-client-*.aar
 
   build-macos-artifact:
@@ -53,16 +66,23 @@ jobs:
       - name: Run server library tests (includes macOS-specific Process/RuleWatcher tests)
         run: ./kotlin test -m server-shared
 
+      - name: Build web-backoffice release bundle
+        run: ./kotlin build -m web-backoffice -v release
+
       - name: Build ghost-be macOS release binary
         run: ./kotlin build -m server-macos -v release
 
-      - name: Stage macOS release binary
+      - name: Stage macOS release archive
         run: |
           binary=$(find build/tasks -ipath "*server-macos*" -type f -perm -u+x -print -quit)
           test -n "$binary"
-          cp "$binary" ghost-be-macos-arm64
+          staging=ghost-be-macos-arm64
+          mkdir -p "$staging/web-backoffice"
+          cp "$binary" "$staging/ghost-be"
+          cp -r web-backoffice/build/tasks/_web-backoffice_buildWasmJsAppWasmJsRelease/. "$staging/web-backoffice"
+          tar czf ghost-be-macos-arm64.tar.gz -C "$staging" .
 
       - name: Upload macOS release artifact
         uses: softprops/action-gh-release@v2
         with:
-          files: ghost-be-macos-arm64
+          files: ghost-be-macos-arm64.tar.gz

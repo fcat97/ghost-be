@@ -61,21 +61,37 @@ Options:
   --host <addr>     Address to bind (default: 127.0.0.1; use 0.0.0.0 to allow
                     connections from other devices on the LAN)
   --web-dist <dir>  Directory of the built web-backoffice static files
-                    (default: web-backoffice/build/tasks/_web-backoffice_buildWasmJsAppWasmJsRelease)
+                    (default: the "web-backoffice" folder next to this binary,
+                    if present; otherwise
+                    web-backoffice/build/tasks/_web-backoffice_buildWasmJsAppWasmJsRelease
+                    for in-repo dev runs)
   -h, --help        Show this help and exit
 
 Docs: https://github.com/fcat97/ghost-be#readme"""
 
 private sealed interface ParsedArgs {
     data object Help : ParsedArgs
-    data class Run(val port: Int, val rulesDir: String, val host: String, val webDist: String) : ParsedArgs
+    data class Run(val port: Int, val rulesDir: String, val host: String, val webDist: String?) : ParsedArgs
+}
+
+/**
+ * Picks the web-backoffice static dir: an explicit --web-dist always wins; otherwise
+ * prefer a "web-backoffice" folder bundled next to the running binary (the release
+ * archive layout), falling back to the in-repo dev build output so `./kotlin run`
+ * from a checkout keeps working unchanged.
+ */
+internal fun resolveWebDist(explicit: String?, executableDir: Path?, exists: (Path) -> Boolean): Path {
+    if (explicit != null) return explicit.toPath()
+    val bundled = executableDir?.let { it / "web-backoffice" }
+    if (bundled != null && exists(bundled)) return bundled
+    return "web-backoffice/build/tasks/_web-backoffice_buildWasmJsAppWasmJsRelease".toPath()
 }
 
 private fun parseArgs(args: Array<String>): ParsedArgs {
     var port = 44678
     var rulesDir = "./rules"
     var host = "127.0.0.1"
-    var webDist = "web-backoffice/build/tasks/_web-backoffice_buildWasmJsAppWasmJsRelease"
+    var webDist: String? = null
     var i = 0
     while (i < args.size) {
         when (args[i]) {
@@ -113,7 +129,7 @@ fun main(args: Array<String>) {
     }
     val (port, rulesDirArg, host, webDistArg) = parsed as ParsedArgs.Run
     val rulesDir = rulesDirArg.toPath()
-    val webDist = webDistArg.toPath()
+    val webDist = resolveWebDist(webDistArg, executableDir(), FileSystem.SYSTEM::exists)
 
     println(BANNER)
     val rulesRef = AtomicReference(loadRulesOrExit(rulesDir))
