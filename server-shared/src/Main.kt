@@ -63,7 +63,7 @@ Options:
   --web-dist <dir>  Directory of the built web-backoffice static files
                     (default: the "web-backoffice" folder next to this binary,
                     if present; otherwise
-                    web-backoffice/build/tasks/_web-backoffice_buildWasmJsAppWasmJsRelease
+                    build/tasks/_web-backoffice_buildWasmJsAppWasmJsRelease
                     for in-repo dev runs)
   -h, --help        Show this help and exit
 
@@ -84,7 +84,7 @@ internal fun resolveWebDist(explicit: String?, executableDir: Path?, exists: (Pa
     if (explicit != null) return explicit.toPath()
     val bundled = executableDir?.let { it / "web-backoffice" }
     if (bundled != null && exists(bundled)) return bundled
-    return "web-backoffice/build/tasks/_web-backoffice_buildWasmJsAppWasmJsRelease".toPath()
+    return "build/tasks/_web-backoffice_buildWasmJsAppWasmJsRelease".toPath()
 }
 
 private fun parseArgs(args: Array<String>): ParsedArgs {

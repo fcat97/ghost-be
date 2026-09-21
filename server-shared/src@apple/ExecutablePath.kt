@@ -1,28 +1,26 @@
 package ghostbe.server
 
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.UIntVar
-import kotlinx.cinterop.addressOf
-import kotlinx.cinterop.alloc
-import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.ptr
-import kotlinx.cinterop.usePinned
-import kotlinx.cinterop.value
+import kotlinx.cinterop.toKString
 import okio.Path
 import okio.Path.Companion.toPath
-import platform.darwin._NSGetExecutablePath
+import platform.Foundation.NSProcessInfo
+import platform.posix.free
+import platform.posix.realpath
 
+/**
+ * Darwin has no /proc/self/exe, so this resolves argv[0] (via NSProcessInfo, which
+ * captures it verbatim) against the process's cwd and symlinks with realpath() --
+ * reliable as long as the binary was launched by path (e.g. `./ghost-be`), which is
+ * how every documented workflow for this binary invokes it. A bare `ghost-be` found
+ * via $PATH would leave argv[0] without a path component for realpath to resolve,
+ * falling through to null (the dev-tree fallback) rather than a wrong directory.
+ */
 @OptIn(ExperimentalForeignApi::class)
-actual fun executableDir(): Path? = memScoped {
-    val size = alloc<UIntVar>()
-    size.value = 0u
-    _NSGetExecutablePath(null, size.ptr)
-    if (size.value == 0u) return@memScoped null
-
-    val buffer = ByteArray(size.value.toInt())
-    val ok = buffer.usePinned { pinned -> _NSGetExecutablePath(pinned.addressOf(0), size.ptr) }
-    if (ok != 0) return@memScoped null
-
-    val terminator = buffer.indexOf(0.toByte()).let { if (it < 0) buffer.size else it }
-    buffer.decodeToString(0, terminator).toPath().parent
+actual fun executableDir(): Path? {
+    val argv0 = NSProcessInfo.processInfo.arguments.firstOrNull() ?: return null
+    val resolved = realpath(argv0, null) ?: return null
+    val path = resolved.toKString()
+    free(resolved)
+    return path.toPath().parent
 }

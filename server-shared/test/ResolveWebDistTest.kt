@@ -6,7 +6,7 @@ import okio.Path.Companion.toPath
 
 class ResolveWebDistTest {
     private val executableDir = "/opt/ghost-be".toPath()
-    private val devFallback = "web-backoffice/build/tasks/_web-backoffice_buildWasmJsAppWasmJsRelease".toPath()
+    private val devFallback = "build/tasks/_web-backoffice_buildWasmJsAppWasmJsRelease".toPath()
 
     @Test
     fun `an explicit --web-dist always wins`() {
