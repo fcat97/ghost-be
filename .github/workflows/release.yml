@@ -30,6 +30,7 @@ jobs:
           mkdir -p "$staging/web-backoffice"
           cp build/tasks/_server-linux_linkLinuxX64Release/server-linux.kexe "$staging/ghost-be"
           cp -r build/tasks/_web-backoffice_buildWasmJsAppWasmJsRelease/. "$staging/web-backoffice"
+          cp -r maestro "$staging/maestro"
           tar czf ghost-be-linux-x64.tar.gz -C "$staging" .
 
       - name: Build ghost-be Windows release binary
@@ -41,6 +42,7 @@ jobs:
           mkdir -p "$staging/web-backoffice"
           cp build/tasks/_server-windows_linkMingwX64Release/server-windows.exe "$staging/ghost-be.exe"
           cp -r build/tasks/_web-backoffice_buildWasmJsAppWasmJsRelease/. "$staging/web-backoffice"
+          cp -r maestro "$staging/maestro"
           (cd "$staging" && zip -r "../ghost-be-windows-x64.zip" .)
 
       - name: Build client release AAR
@@ -80,6 +82,7 @@ jobs:
           mkdir -p "$staging/web-backoffice"
           cp "$binary" "$staging/ghost-be"
           cp -r build/tasks/_web-backoffice_buildWasmJsAppWasmJsRelease/. "$staging/web-backoffice"
+          cp -r maestro "$staging/maestro"
           tar czf ghost-be-macos-arm64.tar.gz -C "$staging" .
 
       - name: Upload macOS release artifact

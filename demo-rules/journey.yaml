@@ -1,0 +1,37 @@
+# A worked example of the two fields that make a multi-step journey expressible.
+# Driven by maestro/example-flow.yaml -- see README "Driving tests from Maestro".
+
+rules:
+  # No `scenario` key, so this is baseline: always active. Your happy path lives
+  # here once, and each test switches on only the thing it wants broken.
+  - name: checkout-ok
+    match:
+      method: POST
+      path: /v1/checkout
+    response:
+      file: responses/checkout-ok.json
+      status: 200
+      headers: { Content-Type: application/json }
+
+  # Tagged, so it is inert until a test activates "checkout-fails" -- and then it
+  # beats the baseline rule above for the same endpoint, whatever the order here.
+  - name: checkout-declined
+    scenario: checkout-fails
+    match:
+      method: POST
+      path: /v1/checkout
+    response:
+      file: responses/checkout-declined.json
+      status: 402
+      headers: { Content-Type: application/json }
+
+  # `responses` is served one per matching call, and the last entry sticks forever --
+  # so an app that polls sees pending, pending, then done however many times it asks.
+  - name: order-status
+    match:
+      method: GET
+      pathPattern: "/v1/orders/{id}"
+    responses:
+      - { file: responses/order-pending.json, status: 200, headers: { Content-Type: application/json } }
+      - { file: responses/order-pending.json, status: 200, headers: { Content-Type: application/json } }
+      - { file: responses/order-done.json, status: 200, headers: { Content-Type: application/json } }

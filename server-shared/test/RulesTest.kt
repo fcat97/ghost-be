@@ -100,8 +100,27 @@ class RulesTest {
         for (dir in shipped) {
             val rules = loadRulesFromDirectory(dir.toPath())
             assertTrue(rules.isNotEmpty(), "no rules loaded from $dir")
-            assertTrue(rules.all { it.scenario == null }, "$dir should be all-baseline")
         }
+
+        // The fixtures predate scenarios entirely, so they must still parse as pure
+        // baseline -- that is the part which proves nothing about old files changed.
+        val preScenario = loadRulesFromDirectory("test/fixtures/rules".toPath()) +
+            loadRulesFromDirectory("test/fixtures/rules-api".toPath())
+        assertTrue(preScenario.all { it.scenario == null && it.responses.isEmpty() })
+        assertTrue(preScenario.all { it.response != null })
+    }
+
+    @Test
+    fun `loads the demo journey rules that the example Maestro flow drives`() {
+        // maestro/example-flow.yaml asserts against these exact names, so a rename here
+        // would silently break the worked example users copy from.
+        val rules = loadRulesFromDirectory("../demo-rules".toPath())
+        val byName = rules.associateBy { it.name }
+
+        assertEquals(null, byName.getValue("checkout-ok").scenario)
+        assertEquals("checkout-fails", byName.getValue("checkout-declined").scenario)
+        assertEquals(3, byName.getValue("order-status").responses.size)
+        assertEquals(listOf("checkout-fails"), scenarioNames(rules))
     }
 
     @Test
