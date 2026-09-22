@@ -60,6 +60,9 @@ Options:
   --rules <dir>     Directory of rule .yaml files to watch (default: ./rules)
   --host <addr>     Address to bind (default: 127.0.0.1; use 0.0.0.0 to allow
                     connections from other devices on the LAN)
+  --journal-size <n>
+                    How many intercepted requests to keep for /api/test/journal
+                    (default: 500)
   --web-dist <dir>  Directory of the built web-backoffice static files
                     (default: the "web-backoffice" folder next to this binary,
                     if present; otherwise
@@ -71,7 +74,13 @@ Docs: https://github.com/fcat97/ghost-be#readme"""
 
 private sealed interface ParsedArgs {
     data object Help : ParsedArgs
-    data class Run(val port: Int, val rulesDir: String, val host: String, val webDist: String?) : ParsedArgs
+    data class Run(
+        val port: Int,
+        val rulesDir: String,
+        val host: String,
+        val webDist: String?,
+        val journalSize: Int
+    ) : ParsedArgs
 }
 
 /**
@@ -92,6 +101,7 @@ private fun parseArgs(args: Array<String>): ParsedArgs {
     var rulesDir = "./rules"
     var host = "127.0.0.1"
     var webDist: String? = null
+    var journalSize = DEFAULT_JOURNAL_CAPACITY
     var i = 0
     while (i < args.size) {
         when (args[i]) {
@@ -100,10 +110,11 @@ private fun parseArgs(args: Array<String>): ParsedArgs {
             "--rules" -> { rulesDir = args[i + 1]; i += 2 }
             "--host" -> { host = args[i + 1]; i += 2 }
             "--web-dist" -> { webDist = args[i + 1]; i += 2 }
+            "--journal-size" -> { journalSize = args[i + 1].toInt(); i += 2 }
             else -> { i += 1 }
         }
     }
-    return ParsedArgs.Run(port, rulesDir, host, webDist)
+    return ParsedArgs.Run(port, rulesDir, host, webDist, journalSize)
 }
 
 private fun loadRulesOrExit(rulesDir: Path): List<Rule> {
@@ -127,7 +138,7 @@ fun main(args: Array<String>) {
         println(USAGE)
         return
     }
-    val (port, rulesDirArg, host, webDistArg) = parsed as ParsedArgs.Run
+    val (port, rulesDirArg, host, webDistArg, journalSize) = parsed as ParsedArgs.Run
     val rulesDir = rulesDirArg.toPath()
     val webDist = resolveWebDist(webDistArg, executableDir(), FileSystem.SYSTEM::exists)
 
@@ -156,12 +167,13 @@ fun main(args: Array<String>) {
     // Deliberately not handed to the rule-watcher Worker above: keeping it out means the
     // only concurrency on this state is between Ktor request threads. Anything the watcher
     // ever needs would go through its producer tuple, since its job lambda cannot capture.
-    val session = TestSession()
+    val session = TestSession(journalCapacity = journalSize)
     embeddedServer(CIO, port = port, host = host) {
         install(SSE)
         routing {
             interceptRoute({ rulesRef.value }, resolver, session)
             rulesApiRoute(rulesDir)
+            testApiRoute(session, { rulesRef.value }, journalSize)
             trafficSseRoute()
             webStaticRoute(webDist) // get("/{path...}") catch-all -- must stay last
         }

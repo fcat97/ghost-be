@@ -15,7 +15,7 @@ internal fun parseUrl(url: String): Pair<String, Map<String, String>> {
     return fullPath to query
 }
 
-internal fun pathMatchesPattern(pattern: String, actual: String): Boolean {
+private fun pathMatchesPattern(pattern: String, actual: String): Boolean {
     val patternSegments = pattern.trim('/').split('/')
     val actualSegments = actual.trim('/').split('/')
     if (patternSegments.size != actualSegments.size) return false
