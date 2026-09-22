@@ -22,7 +22,7 @@ fun Route.interceptRoute(currentRules: () -> List<Rule>, resolver: ResponseResol
             return@post
         }
 
-        val resolved = resolver.resolve(rule.name, rule.response, envelope)
+        val resolved = resolver.resolve(rule.name, pickVariant(rule.responseVariants(), 0), envelope)
         val responseEnvelope: ResponseEnvelope = when (resolved) {
             is ResolvedResponse.Success -> {
                 println("ghost-be: $requestLabel -> intercept (rule '${rule.name}') -> ${resolved.status}")

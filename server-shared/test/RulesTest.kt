@@ -32,8 +32,8 @@ class RulesTest {
         assertEquals("/v1/users/42", rule.match.path)
         assertEquals(mapOf("active" to "true"), rule.match.query)
         assertEquals(mapOf("X-Feature-Flag" to "beta"), rule.match.headers)
-        assertEquals("responses/user-42.json", rule.response.file)
-        assertEquals(200, rule.response.status)
+        assertEquals("responses/user-42.json", rule.response?.file)
+        assertEquals(200, rule.response?.status)
     }
 
     @Test
@@ -50,7 +50,7 @@ class RulesTest {
         """.trimIndent()
         val rule = loadRuleFile(fixtureWithScript).rules[0]
         assertEquals("/v1/users/{id}", rule.match.pathPattern)
-        assertEquals("scripts/dynamic_user.py", rule.response.script)
+        assertEquals("scripts/dynamic_user.py", rule.response?.script)
     }
 
     @Test
@@ -151,6 +151,68 @@ class RulesTest {
                 """.trimIndent()
             )
         }
+    }
+
+    @Test
+    fun `parses a responses sequence`() {
+        val sequence = """
+            rules:
+              - name: order-status
+                match: { method: GET, path: /v1/order/1 }
+                responses:
+                  - { file: responses/pending.json, status: 200 }
+                  - { file: responses/done.json, status: 200 }
+        """.trimIndent()
+        val rule = loadRuleFile(sequence).rules[0]
+        assertEquals(null, rule.response)
+        assertEquals(listOf("responses/pending.json", "responses/done.json"), rule.responses.map { it.file })
+    }
+
+    @Test
+    fun `rejects a rule declaring both response and responses`() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            loadRuleFile(
+                """
+                rules:
+                  - name: ambiguous
+                    match: { method: GET, path: /v1/x }
+                    response: { file: a.json, status: 200 }
+                    responses:
+                      - { file: b.json, status: 500 }
+                """.trimIndent()
+            )
+        }
+        assertTrue(error.message!!.contains("ambiguous"), "message should name the rule: ${error.message}")
+    }
+
+    @Test
+    fun `rejects a rule declaring neither response nor responses`() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            loadRuleFile("rules:\n  - name: empty\n    match: { method: GET, path: /v1/x }\n")
+        }
+        assertTrue(error.message!!.contains("empty"), "message should name the rule: ${error.message}")
+    }
+
+    @Test
+    fun `rejects an explicitly empty responses list`() {
+        assertFailsWith<IllegalArgumentException> {
+            loadRuleFile("rules:\n  - name: blank\n    match: { method: GET, path: /v1/x }\n    responses: []\n")
+        }
+    }
+
+    @Test
+    fun `round-trips a rule carrying both a scenario and a responses sequence`() {
+        val both = """
+            rules:
+              - name: checkout-flaky
+                scenario: checkout-retry
+                match: { method: POST, path: /v1/checkout }
+                responses:
+                  - { file: responses/500.json, status: 500 }
+                  - { file: responses/ok.json, status: 200 }
+        """.trimIndent()
+        val original = loadRuleFile(both)
+        assertEquals(original, loadRuleFile(renderRuleFile(original)))
     }
 
     @Test

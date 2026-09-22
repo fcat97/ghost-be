@@ -38,22 +38,46 @@ data class ResponseSpec(
 data class Rule(
     val name: String,
     val match: MatchSpec,
-    val response: ResponseSpec,
+    /** Exactly one of this and [responses] is set; [validateRules] enforces it. */
+    val response: ResponseSpec? = null,
     val enabled: Boolean = true,
     // New fields go after `enabled`: MatcherTest constructs Rule positionally.
     /** Inert until this scenario is activated; null means "baseline", always active. */
-    val scenario: String? = null
+    val scenario: String? = null,
+    /** Responses served one per matching call, the last entry sticking. */
+    val responses: List<ResponseSpec> = emptyList()
 )
 
 @Serializable
 data class RuleFile(val rules: List<Rule>)
 
+/**
+ * Rejects a rule that declares neither `response` nor `responses`, or both.
+ *
+ * Both-at-once is rejected rather than resolved by a precedence rule: a silent winner
+ * there is the kind of thing that costs an afternoon to track down. Throws
+ * [IllegalArgumentException], which every caller of [loadRuleFile] already handles, so
+ * validation reaches the rules API and startup alike without new error plumbing.
+ */
+internal fun validateRules(ruleFile: RuleFile) {
+    ruleFile.rules.forEach { rule ->
+        require(!(rule.response != null && rule.responses.isNotEmpty())) {
+            "Rule '${rule.name}' declares both 'response' and 'responses' -- use one"
+        }
+        require(rule.response != null || rule.responses.isNotEmpty()) {
+            "Rule '${rule.name}' declares neither 'response' nor a non-empty 'responses'"
+        }
+    }
+}
+
 fun loadRuleFile(yaml: String): RuleFile {
-    return try {
+    val ruleFile = try {
         Yaml.default.decodeFromString(RuleFile.serializer(), yaml)
     } catch (e: Exception) {
         throw IllegalArgumentException("Failed to parse rule YAML: ${e.message}", e)
     }
+    validateRules(ruleFile)
+    return ruleFile
 }
 
 fun renderRuleFile(ruleFile: RuleFile): String {
