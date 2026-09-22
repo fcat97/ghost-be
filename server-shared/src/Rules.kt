@@ -1,9 +1,21 @@
 package ghostbe.server
 
 import com.charleskorn.kaml.Yaml
+import com.charleskorn.kaml.YamlConfiguration
 import kotlinx.serialization.Serializable
 import okio.FileSystem
 import okio.Path
+
+/**
+ * Encoding-side YAML, used only by [renderRuleFile].
+ *
+ * `Yaml.default` encodes defaults, so rendering a rule file back out would write every
+ * key the user left unset -- `pathPattern: null`, `script: null`, `enabled: true` and so
+ * on. That matters because `POST /api/rules/{path}/{ruleName}/toggle` rewrites the user's
+ * whole file through this path, so anything emitted here ends up in their YAML.
+ * Decoding deliberately keeps using `Yaml.default` (strict about unknown keys).
+ */
+private val renderYaml = Yaml(configuration = YamlConfiguration(encodeDefaults = false))
 
 @Serializable
 data class MatchSpec(
@@ -42,7 +54,7 @@ fun loadRuleFile(yaml: String): RuleFile {
 }
 
 fun renderRuleFile(ruleFile: RuleFile): String {
-    return Yaml.default.encodeToString(RuleFile.serializer(), ruleFile)
+    return renderYaml.encodeToString(RuleFile.serializer(), ruleFile)
 }
 
 fun loadRulesFromDirectory(dir: Path, fileSystem: FileSystem = FileSystem.SYSTEM): List<Rule> {

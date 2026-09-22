@@ -3,6 +3,7 @@ package ghostbe.server
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class RulesTest {
@@ -76,6 +77,16 @@ class RulesTest {
         val rendered = renderRuleFile(original)
         val reparsed = loadRuleFile(rendered)
         assertEquals(original, reparsed)
+    }
+
+    @Test
+    fun `renders only the keys the rule actually set`() {
+        // The toggle endpoint rewrites a whole file through renderRuleFile, so anything
+        // emitted here lands in the user's YAML. Defaulted keys must stay out.
+        val rendered = renderRuleFile(loadRuleFile(fixture))
+        assertFalse(rendered.contains("null"), "rendered YAML leaked a defaulted key:\n$rendered")
+        assertTrue(rendered.contains("name: \"get-user-42\""))
+        assertTrue(rendered.contains("file: \"responses/user-42.json\""))
     }
 
     @Test
