@@ -39,7 +39,10 @@ data class Rule(
     val name: String,
     val match: MatchSpec,
     val response: ResponseSpec,
-    val enabled: Boolean = true
+    val enabled: Boolean = true,
+    // New fields go after `enabled`: MatcherTest constructs Rule positionally.
+    /** Inert until this scenario is activated; null means "baseline", always active. */
+    val scenario: String? = null
 )
 
 @Serializable

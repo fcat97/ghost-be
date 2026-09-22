@@ -5,6 +5,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
 import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import okio.Path.Companion.toPath
 
 class RulesTest {
     private val fixture = """
@@ -87,6 +88,69 @@ class RulesTest {
         assertFalse(rendered.contains("null"), "rendered YAML leaked a defaulted key:\n$rendered")
         assertTrue(rendered.contains("name: \"get-user-42\""))
         assertTrue(rendered.contains("file: \"responses/user-42.json\""))
+    }
+
+    @Test
+    fun `loads the rule files shipped in the repo unchanged`() {
+        // The real regression canary: these are files that exist on disk today, plus the
+        // demo rules users copy as a starting point. They must keep loading untouched.
+        // Tests run with server-shared/ as the working directory, as the other
+        // fixture-reading tests in this module assume.
+        val shipped = listOf("test/fixtures/rules", "test/fixtures/rules-api", "../demo-rules")
+        for (dir in shipped) {
+            val rules = loadRulesFromDirectory(dir.toPath())
+            assertTrue(rules.isNotEmpty(), "no rules loaded from $dir")
+            assertTrue(rules.all { it.scenario == null }, "$dir should be all-baseline")
+        }
+    }
+
+    @Test
+    fun `defaults scenario to null when the key is absent`() {
+        // Backward compatibility: every rule file written before scenarios existed must
+        // keep parsing and must keep behaving as baseline.
+        assertEquals(null, loadRuleFile(fixture).rules[0].scenario)
+    }
+
+    @Test
+    fun `parses an explicit scenario tag`() {
+        val tagged = """
+            rules:
+              - name: checkout-declined
+                scenario: checkout-fails
+                match: { method: POST, path: /v1/checkout }
+                response: { file: responses/declined.json, status: 402 }
+        """.trimIndent()
+        assertEquals("checkout-fails", loadRuleFile(tagged).rules[0].scenario)
+    }
+
+    @Test
+    fun `round-trips a rule carrying a scenario tag`() {
+        val tagged = """
+            rules:
+              - name: checkout-declined
+                scenario: checkout-fails
+                match: { method: POST, path: /v1/checkout }
+                response: { file: responses/declined.json, status: 402 }
+        """.trimIndent()
+        val original = loadRuleFile(tagged)
+        assertEquals(original, loadRuleFile(renderRuleFile(original)))
+        assertTrue(renderRuleFile(original).contains("scenario: \"checkout-fails\""))
+    }
+
+    @Test
+    fun `still rejects an unknown key`() {
+        // Confirms adding fields did not loosen parsing into accepting typos.
+        assertFailsWith<IllegalArgumentException> {
+            loadRuleFile(
+                """
+                rules:
+                  - name: typo
+                    scenarios: checkout-fails
+                    match: { method: GET, path: /v1/x }
+                    response: { file: r.json, status: 200 }
+                """.trimIndent()
+            )
+        }
     }
 
     @Test
