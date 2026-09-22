@@ -153,13 +153,17 @@ fun main(args: Array<String>) {
     }
 
     val resolver = ResponseResolver(rulesDir)
+    // Deliberately not handed to the rule-watcher Worker above: keeping it out means the
+    // only concurrency on this state is between Ktor request threads. Anything the watcher
+    // ever needs would go through its producer tuple, since its job lambda cannot capture.
+    val session = TestSession()
     embeddedServer(CIO, port = port, host = host) {
         install(SSE)
         routing {
-            interceptRoute({ rulesRef.value }, resolver)
+            interceptRoute({ rulesRef.value }, resolver, session)
             rulesApiRoute(rulesDir)
             trafficSseRoute()
-            webStaticRoute(webDist)
+            webStaticRoute(webDist) // get("/{path...}") catch-all -- must stay last
         }
     }.start(wait = true)
 }
