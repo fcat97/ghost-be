@@ -247,3 +247,62 @@ When done, stop `ghost-be` (Ctrl-C) and confirm the app falls through to
 the real backend with no rule matching (`intercept: false` passthrough) —
 this is the "nothing breaks if ghost-be isn't running" guarantee and is
 worth checking as the final step of the test.
+
+## 5. Automate the loop with Maestro
+
+The loop above is manual: you edit YAML and re-tap by hand. Once the behavior
+is confirmed, encode it as a repeatable test instead. See README.md "Driving
+tests from Maestro" for the full reference; the short version:
+
+Give each failure case a `scenario:` tag in the rules rather than editing
+`status` in place, and use `responses:` (a list) where a journey needs the
+same endpoint to answer differently on successive calls:
+
+```yaml
+rules:
+  - name: checkout-ok            # no scenario -> baseline, always active
+    match: { method: POST, path: /v1/checkout }
+    response: { file: responses/ok.json, status: 200 }
+
+  - name: checkout-declined
+    scenario: checkout-fails     # dormant until activated, then beats baseline
+    match: { method: POST, path: /v1/checkout }
+    response: { file: responses/declined.json, status: 402 }
+```
+
+Copy the `maestro/` scripts from the release archive next to the flows, then
+drive the whole journey:
+
+```yaml
+appId: <the target app's id>
+---
+- runScript: ghost-be/reset.js
+- runScript:
+    file: ghost-be/scenario.js
+    env: { SCENARIOS: checkout-fails }
+- launchApp:
+    clearState: true
+- tapOn: "Checkout"
+- assertVisible: "Your card was declined."
+- runScript:
+    file: ghost-be/verify.js
+    env: { METHOD: POST, PATH: /v1/checkout, COUNT: "1" }
+- assertTrue: ${output.ghostBeVerifyOk == 'true'}
+```
+
+Run it with `maestro test <flow>.yaml`. Notes that matter when writing these:
+
+- **Maestro runs on the host**, so `runScript` reaches `ghost-be` on
+  `127.0.0.1` with no `adb reverse`. Only the app's own traffic needs it.
+- **Always `reset.js` first.** Otherwise a response sequence resumes where the
+  previous flow left it, and `verify.js` counts the previous flow's requests.
+- **Write `${output.ghostBeVerifyOk == 'true'}`**, never the bare
+  `${output.ghostBeVerifyOk}` — `output` values become strings across steps and
+  a non-empty string is truthy, so the bare form passes even on failure.
+- **Scenario switches are instant and never touch disk**, so there is nothing
+  to sleep on and no risk of leaving the rules directory dirty. This is why
+  scenarios are preferable to editing YAML from a test.
+- `verify.js` is what catches the bugs the UI can't show — wrong payload sent,
+  request fired twice, request never fired. Add `journal.js` above a failing
+  step to print what the app actually sent.
+- One `ghost-be` per device: scenarios and counters are per-process.

@@ -191,7 +191,10 @@ runner) alongside the app you're testing:
 ghost-be --port 44678 --rules ./rules
 ```
 
-Both flags are optional (`44678` and `./rules` are the defaults).
+Both flags are optional (`44678` and `./rules` are the defaults). Run
+`ghost-be --help` for the rest, including `--host` for LAN access and
+`--journal-size` for how many requests to retain for
+[test assertions](#driving-tests-from-maestro).
 
 ### Web backoffice
 
@@ -247,6 +250,57 @@ be a pattern like `/v1/users/{id}` for matching a family of URLs. See the
 [design spec](docs/superpowers/specs/2026-09-06-okhttp-interceptor-design.md#6-rule-configuration)
 for the full format.
 
+### Scenarios and response sequences
+
+Two optional fields turn a set of rules into a multi-step journey. Both are
+additive — every rule file written without them keeps working unchanged.
+
+A **`scenario`** tag makes a rule dormant until something activates that
+scenario. A rule without one is *baseline*: always active. When a scenario is
+active, its rules beat baseline rules for the same endpoint, regardless of the
+order they appear in:
+
+```yaml
+rules:
+  # Baseline: always active. Your happy path lives here once.
+  - name: checkout-ok
+    match: { method: POST, path: /v1/checkout }
+    response: { file: responses/checkout-ok.json, status: 200 }
+
+  # Dormant until "checkout-fails" is activated, and then it wins.
+  - name: checkout-declined
+    scenario: checkout-fails
+    match: { method: POST, path: /v1/checkout }
+    response: { file: responses/declined.json, status: 402 }
+```
+
+So each test switches on only the one thing it wants broken, instead of
+maintaining a whole parallel copy of your mocks. Several scenarios can be
+active at once — activate `checkout-fails` and `slow-network` together and each
+tagged rule fires for its own endpoint.
+
+**`responses`** (plural) replaces `response` with an ordered list, served one
+per matching call. The last entry sticks, so a sequence never runs out — which
+matters because you rarely know exactly how many times an app will poll or
+retry:
+
+```yaml
+  - name: order-status
+    match:
+      method: GET
+      pathPattern: "/v1/orders/{id}"
+    responses:
+      - { file: responses/order-pending.json, status: 200 }   # 1st call
+      - { file: responses/order-pending.json, status: 200 }   # 2nd call
+      - { file: responses/order-done.json, status: 200 }      # 3rd call onwards
+```
+
+A rule must declare exactly one of `response` or `responses`; declaring both is
+rejected at load time rather than resolved by a silent precedence rule.
+
+[`demo-rules/journey.yaml`](demo-rules/journey.yaml) is a runnable example of
+both fields together.
+
 ### Dynamic responses with a script
 
 For responses that depend on the request (rather than always returning the
@@ -272,6 +326,124 @@ For the exact request/response JSON shapes and a full worked example, see
 [`demo-rules/scripts/dynamic_user.py`](demo-rules/scripts/dynamic_user.py)
 (wired up by [`demo-rules/dynamic.yaml`](demo-rules/dynamic.yaml)) — its
 comments document the contract, and it's a real script you can run.
+
+## Driving tests from Maestro
+
+Scenarios and sequences describe a journey; this is how a test drives it. You
+write an ordinary [Maestro](https://maestro.dev) flow, and `ghost-be` supplies
+the data — so you can test a whole journey end to end with no real backend.
+
+Maestro runs on your machine and drives the app as a black box, so its
+`runScript` steps reach `ghost-be` on `127.0.0.1` directly. Only the *app*
+needs `adb reverse tcp:44678 tcp:44678`. Nothing changes in your app code
+beyond the interceptor you already added.
+
+Copy the [`maestro/`](maestro) scripts (bundled in every release archive, next
+to the binary) alongside your flows:
+
+```yaml
+appId: com.example.app
+---
+# Clears active scenarios, call counters and the journal. Always go first:
+# without it a sequence resumes where the last flow left it.
+- runScript: ghost-be/reset.js
+
+- launchApp:
+    clearState: true
+- tapOn: "Checkout"
+- assertVisible: "Order confirmed"
+
+# Assert the app really sent the request, not just that the screen changed.
+- runScript:
+    file: ghost-be/verify.js
+    env: { METHOD: POST, PATH: /v1/checkout, COUNT: "1" }
+- assertTrue: ${output.ghostBeVerifyOk == 'true'}
+
+# One call switches which mock is live, effective on the app's very next
+# request — no sleep, and nothing is written to your rules directory.
+- runScript:
+    file: ghost-be/scenario.js
+    env: { SCENARIOS: checkout-fails }
+
+- launchApp:
+    clearState: true
+- tapOn: "Checkout"
+- assertVisible: "Your card was declined."
+```
+
+| Script | `env` | What it does |
+|---|---|---|
+| `reset.js` | — | Clears scenarios, counters and journal |
+| `scenario.js` | `SCENARIOS` | Makes exactly those scenarios active (comma-separated; empty string clears) |
+| `verify.js` | `METHOD`, `PATH`, `COUNT`, `BODY_CONTAINS` | Asserts on what the app sent; sets `output.ghostBeVerifyOk` |
+| `journal.js` | `METHOD`, `PATH`, `BODY_CONTAINS`, `LIMIT` | Prints matching requests for debugging; never fails a flow |
+
+All four take an optional `GHOST_BE_URL` (default `http://127.0.0.1:44678`).
+
+Two details that are easy to get wrong:
+
+- **Write `${output.ghostBeVerifyOk == 'true'}`, not `${output.ghostBeVerifyOk}`.**
+  Values on `output` cross step boundaries as strings, and a non-empty string is
+  truthy — so the bare form passes even when the check failed.
+- **There's one script per action rather than one helper library**, because
+  Maestro keeps only the `output` object between steps. Function declarations
+  don't survive, so a `ghostBe.verify(...)` helper defined in one step wouldn't
+  exist in the next.
+
+[`maestro/example-flow.yaml`](maestro/example-flow.yaml) is a complete flow
+covering a happy path, a failure branch and a polling step, driving
+[`demo-rules/journey.yaml`](demo-rules/journey.yaml).
+
+### What's ephemeral, and what isn't
+
+Everything a flow changes — active scenarios, call counters, the journal —
+lives in memory only. Your rules directory is **never written to**, so a
+crashed test can't leave your repo dirty, and every change takes effect before
+the app's next request with nothing to poll or sleep on.
+
+That also means it's all gone when `ghost-be` restarts, and that `reset.js`
+is what separates one flow from the next.
+
+### The control API
+
+The scripts are a thin wrapper over plain HTTP, so any framework can drive
+`ghost-be` the same way:
+
+| Method | Path | Purpose |
+|---|---|---|
+| `GET` | `/api/test/state` | Active and available scenarios, hit counts, journal size |
+| `PUT` | `/api/test/scenarios` | `{"active":["a","b"]}` — full replacement |
+| `POST` | `/api/test/scenarios/{name}` | Activate one |
+| `DELETE` | `/api/test/scenarios/{name}` | Deactivate one |
+| `GET` | `/api/test/journal` | `{count, entries}`; filters `method`, `path`, `bodyContains`, `limit` |
+| `GET` | `/api/test/journal/count` | The count alone, as a bare integer |
+| `POST` | `/api/test/reset` | Clear everything |
+
+Every mutation returns the full new state, so a flow can set and assert in one
+call. Deactivation and reset are idempotent and never fail. `PUT
+/api/test/scenarios` is the exception: it rejects a name no loaded rule
+declares, with `400` and the list of names that do exist — a silently-ignored
+typo is the easiest way to end up with a green test that asserts nothing.
+
+`bodyContains` matches the **decoded** request body, so you filter on the
+payload your app sends rather than its base64 encoding.
+
+`--journal-size <n>` sets how many requests are retained (default 500); the
+oldest are dropped once it's full.
+
+### One device per instance
+
+Scenarios and counters are global to a `ghost-be` process, so two devices
+pointed at one instance will consume each other's sequence steps. Run one
+`ghost-be` per device — on separate ports — when testing in parallel.
+
+### A note on `--host 0.0.0.0`
+
+Binding to the LAN (as the Wi-Fi testing path above suggests) also exposes
+`/api/test/*` and the request journal, and the journal retains request headers
+— including `Authorization`. That's no worse than `/api/rules`, which can
+already rewrite your rule files over the same connection, but it's worth
+knowing. The default `127.0.0.1` bind is all Maestro ever needs.
 
 ## Project status
 
