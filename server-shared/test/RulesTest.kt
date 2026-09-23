@@ -3,7 +3,9 @@ package ghostbe.server
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
+import okio.Path.Companion.toPath
 
 class RulesTest {
     private val fixture = """
@@ -30,8 +32,8 @@ class RulesTest {
         assertEquals("/v1/users/42", rule.match.path)
         assertEquals(mapOf("active" to "true"), rule.match.query)
         assertEquals(mapOf("X-Feature-Flag" to "beta"), rule.match.headers)
-        assertEquals("responses/user-42.json", rule.response.file)
-        assertEquals(200, rule.response.status)
+        assertEquals("responses/user-42.json", rule.response?.file)
+        assertEquals(200, rule.response?.status)
     }
 
     @Test
@@ -48,7 +50,7 @@ class RulesTest {
         """.trimIndent()
         val rule = loadRuleFile(fixtureWithScript).rules[0]
         assertEquals("/v1/users/{id}", rule.match.pathPattern)
-        assertEquals("scripts/dynamic_user.py", rule.response.script)
+        assertEquals("scripts/dynamic_user.py", rule.response?.script)
     }
 
     @Test
@@ -76,6 +78,160 @@ class RulesTest {
         val rendered = renderRuleFile(original)
         val reparsed = loadRuleFile(rendered)
         assertEquals(original, reparsed)
+    }
+
+    @Test
+    fun `renders only the keys the rule actually set`() {
+        // The toggle endpoint rewrites a whole file through renderRuleFile, so anything
+        // emitted here lands in the user's YAML. Defaulted keys must stay out.
+        val rendered = renderRuleFile(loadRuleFile(fixture))
+        assertFalse(rendered.contains("null"), "rendered YAML leaked a defaulted key:\n$rendered")
+        assertTrue(rendered.contains("name: \"get-user-42\""))
+        assertTrue(rendered.contains("file: \"responses/user-42.json\""))
+    }
+
+    @Test
+    fun `loads the rule files shipped in the repo unchanged`() {
+        // The real regression canary: these are files that exist on disk today, plus the
+        // demo rules users copy as a starting point. They must keep loading untouched.
+        // Tests run with server-shared/ as the working directory, as the other
+        // fixture-reading tests in this module assume.
+        val shipped = listOf("test/fixtures/rules", "test/fixtures/rules-api", "../demo-rules")
+        for (dir in shipped) {
+            val rules = loadRulesFromDirectory(dir.toPath())
+            assertTrue(rules.isNotEmpty(), "no rules loaded from $dir")
+        }
+
+        // The fixtures predate scenarios entirely, so they must still parse as pure
+        // baseline -- that is the part which proves nothing about old files changed.
+        val preScenario = loadRulesFromDirectory("test/fixtures/rules".toPath()) +
+            loadRulesFromDirectory("test/fixtures/rules-api".toPath())
+        assertTrue(preScenario.all { it.scenario == null && it.responses.isEmpty() })
+        assertTrue(preScenario.all { it.response != null })
+    }
+
+    @Test
+    fun `loads the demo journey rules that the example Maestro flow drives`() {
+        // maestro/example-flow.yaml asserts against these exact names, so a rename here
+        // would silently break the worked example users copy from.
+        val rules = loadRulesFromDirectory("../demo-rules".toPath())
+        val byName = rules.associateBy { it.name }
+
+        assertEquals(null, byName.getValue("checkout-ok").scenario)
+        assertEquals("checkout-fails", byName.getValue("checkout-declined").scenario)
+        assertEquals(3, byName.getValue("order-status").responses.size)
+        assertEquals(listOf("checkout-fails"), scenarioNames(rules))
+    }
+
+    @Test
+    fun `defaults scenario to null when the key is absent`() {
+        // Backward compatibility: every rule file written before scenarios existed must
+        // keep parsing and must keep behaving as baseline.
+        assertEquals(null, loadRuleFile(fixture).rules[0].scenario)
+    }
+
+    @Test
+    fun `parses an explicit scenario tag`() {
+        val tagged = """
+            rules:
+              - name: checkout-declined
+                scenario: checkout-fails
+                match: { method: POST, path: /v1/checkout }
+                response: { file: responses/declined.json, status: 402 }
+        """.trimIndent()
+        assertEquals("checkout-fails", loadRuleFile(tagged).rules[0].scenario)
+    }
+
+    @Test
+    fun `round-trips a rule carrying a scenario tag`() {
+        val tagged = """
+            rules:
+              - name: checkout-declined
+                scenario: checkout-fails
+                match: { method: POST, path: /v1/checkout }
+                response: { file: responses/declined.json, status: 402 }
+        """.trimIndent()
+        val original = loadRuleFile(tagged)
+        assertEquals(original, loadRuleFile(renderRuleFile(original)))
+        assertTrue(renderRuleFile(original).contains("scenario: \"checkout-fails\""))
+    }
+
+    @Test
+    fun `still rejects an unknown key`() {
+        // Confirms adding fields did not loosen parsing into accepting typos.
+        assertFailsWith<IllegalArgumentException> {
+            loadRuleFile(
+                """
+                rules:
+                  - name: typo
+                    scenarios: checkout-fails
+                    match: { method: GET, path: /v1/x }
+                    response: { file: r.json, status: 200 }
+                """.trimIndent()
+            )
+        }
+    }
+
+    @Test
+    fun `parses a responses sequence`() {
+        val sequence = """
+            rules:
+              - name: order-status
+                match: { method: GET, path: /v1/order/1 }
+                responses:
+                  - { file: responses/pending.json, status: 200 }
+                  - { file: responses/done.json, status: 200 }
+        """.trimIndent()
+        val rule = loadRuleFile(sequence).rules[0]
+        assertEquals(null, rule.response)
+        assertEquals(listOf("responses/pending.json", "responses/done.json"), rule.responses.map { it.file })
+    }
+
+    @Test
+    fun `rejects a rule declaring both response and responses`() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            loadRuleFile(
+                """
+                rules:
+                  - name: ambiguous
+                    match: { method: GET, path: /v1/x }
+                    response: { file: a.json, status: 200 }
+                    responses:
+                      - { file: b.json, status: 500 }
+                """.trimIndent()
+            )
+        }
+        assertTrue(error.message!!.contains("ambiguous"), "message should name the rule: ${error.message}")
+    }
+
+    @Test
+    fun `rejects a rule declaring neither response nor responses`() {
+        val error = assertFailsWith<IllegalArgumentException> {
+            loadRuleFile("rules:\n  - name: empty\n    match: { method: GET, path: /v1/x }\n")
+        }
+        assertTrue(error.message!!.contains("empty"), "message should name the rule: ${error.message}")
+    }
+
+    @Test
+    fun `rejects an explicitly empty responses list`() {
+        assertFailsWith<IllegalArgumentException> {
+            loadRuleFile("rules:\n  - name: blank\n    match: { method: GET, path: /v1/x }\n    responses: []\n")
+        }
+    }
+
+    @Test
+    fun `round-trips a rule carrying both a scenario and a responses sequence`() {
+        val both = """
+            rules:
+              - name: checkout-flaky
+                scenario: checkout-retry
+                match: { method: POST, path: /v1/checkout }
+                responses:
+                  - { file: responses/500.json, status: 500 }
+                  - { file: responses/ok.json, status: 200 }
+        """.trimIndent()
+        val original = loadRuleFile(both)
+        assertEquals(original, loadRuleFile(renderRuleFile(original)))
     }
 
     @Test

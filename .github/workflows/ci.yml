@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+# A new push to a PR makes the in-flight run redundant, so don't pay for it.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  server-tests:
+    name: Server tests (server-shared)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # The ./kotlin wrapper provisions its own JRE, Kotlin CLI and Kotlin/Native
+      # toolchain on first use, so there is no setup-java step -- but that download is
+      # by far the slowest part of the run, hence the cache.
+      - name: Cache Kotlin toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.konan
+            ~/.cache/JetBrains/Kotlin
+            ~/.m2/repository
+          key: kotlin-${{ runner.os }}-${{ hashFiles('kotlin', '**/module.yaml', 'libs.versions.toml') }}
+          restore-keys: |
+            kotlin-${{ runner.os }}-
+
+      - name: Run server tests
+        run: ./kotlin test -m server-shared
+
+  android-client-tests:
+    name: Android client tests (client-android)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Cache Kotlin toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.konan
+            ~/.cache/JetBrains/Kotlin
+            ~/.m2/repository
+          key: kotlin-${{ runner.os }}-${{ hashFiles('kotlin', '**/module.yaml', 'libs.versions.toml') }}
+          restore-keys: |
+            kotlin-${{ runner.os }}-
+
+      # These are plain JVM unit tests (mockwebserver standing in for ghost-be and for
+      # the real backend) -- no emulator, no device.
+      - name: Run Android client tests
+        run: ./kotlin test -m client-android
+
+  flutter-client-tests:
+    name: Flutter client tests (client-flutter)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - uses: dart-lang/setup-dart@v1
+
+      - name: Install dependencies
+        run: dart pub get
+        working-directory: client-flutter
+
+      - name: Analyze
+        run: dart analyze
+        working-directory: client-flutter
+
+      - name: Test
+        run: dart test
+        working-directory: client-flutter

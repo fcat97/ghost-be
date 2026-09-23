@@ -26,12 +26,17 @@ class ResponseResolver(
     private val fileSystem: FileSystem = FileSystem.SYSTEM,
     private val interpreterFor: (String) -> String? = ::defaultInterpreterFor
 ) {
-    fun resolve(rule: Rule, envelope: RequestEnvelope): ResolvedResponse {
-        val spec = rule.response
+    /**
+     * Turns a single [ResponseSpec] into bytes. Deliberately takes one spec rather than the
+     * whole [Rule]: a rule may carry a sequence of responses, and choosing between them is
+     * the caller's job (see `pickVariant`), so resolving stays side-effect-free and has no
+     * opinion about how many variants exist.
+     */
+    fun resolve(ruleName: String, spec: ResponseSpec, envelope: RequestEnvelope): ResolvedResponse {
         return when {
-            spec.file != null -> resolveStatic(rule.name, spec)
-            spec.script != null -> resolveScript(rule.name, spec, envelope)
-            else -> ResolvedResponse.Failure(rule.name, "Rule has neither 'file' nor 'script' in its response")
+            spec.file != null -> resolveStatic(ruleName, spec)
+            spec.script != null -> resolveScript(ruleName, spec, envelope)
+            else -> ResolvedResponse.Failure(ruleName, "Rule has neither 'file' nor 'script' in its response")
         }
     }
 

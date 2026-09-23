@@ -1,6 +1,9 @@
 package ghostbe.server
 
-private fun parseUrl(url: String): Pair<String, Map<String, String>> {
+// internal so the request journal derives a request's path with the identical function
+// the matcher uses -- otherwise a journal query could disagree about `/v1/x` with the
+// rule that actually matched it.
+internal fun parseUrl(url: String): Pair<String, Map<String, String>> {
     val withoutScheme = url.substringAfter("://")
     val pathAndQuery = withoutScheme.substringAfter('/', missingDelimiterValue = "")
     val fullPath = "/" + pathAndQuery.substringBefore('?')

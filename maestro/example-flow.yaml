@@ -1,0 +1,58 @@
+# A worked ghost-be + Maestro flow, driving the rules in demo-rules/journey.yaml.
+#
+# Prerequisites:
+#   1. ghost-be --rules ./demo-rules            (on this machine)
+#   2. adb reverse tcp:44678 tcp:44678          (so the app can reach it)
+#   3. copy maestro/*.js next to your own flows
+#
+# Only the app needs adb reverse. The runScript steps below run on the host, so they
+# talk to ghost-be on 127.0.0.1 directly.
+#
+# This flow is written against the field names in demo-rules/journey.yaml; swap the
+# appId, tapOn targets and assertVisible text for your own app's.
+
+appId: dev.yellowbytes.ghostbe.demoapp
+---
+# Always reset first. Without it a response sequence resumes where the last flow left
+# it, and a verify counts the previous flow's requests too.
+- runScript: ghost-be/reset.js
+
+# ---------------------------------------------------------------- happy path
+- launchApp:
+    clearState: true
+- tapOn: "Checkout"
+- assertVisible: "confirmed"
+
+# Assert the app really sent the request, not just that the screen changed.
+- runScript:
+    file: ghost-be/verify.js
+    env: { METHOD: POST, PATH: /v1/checkout, COUNT: "1" }
+- assertTrue: ${output.ghostBeVerifyOk == 'true'}
+
+# ------------------------------------------------------- the failure branch
+# One call switches which mock is live. It applies to the app's very next
+# request -- no sleep, and nothing is written to your rules directory.
+- runScript:
+    file: ghost-be/scenario.js
+    env: { SCENARIOS: checkout-fails }
+
+- launchApp:
+    clearState: true
+- tapOn: "Checkout"
+- assertVisible: "Your card was declined."
+
+# ------------------------------------------------------------ a polling step
+# order-status serves pending, pending, then done. Back to baseline first.
+- runScript:
+    file: ghost-be/scenario.js
+    env: { SCENARIOS: "" }
+
+- tapOn: "Refresh order"
+- assertVisible: "pending"
+- tapOn: "Refresh order"
+- assertVisible: "pending"
+- tapOn: "Refresh order"
+- assertVisible: "done"
+
+# If any assertion above fails, add this step above it to see what the app sent:
+# - runScript: ghost-be/journal.js
