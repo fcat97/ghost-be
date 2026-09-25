@@ -7,6 +7,9 @@
 //                 Omit it to mean "at least one".
 //   BODY_CONTAINS optional; substring of the request body. Matched against the
 //                 decoded body, so write what your app sends, not its base64.
+//   SOFT          optional; "true" records the result without failing the flow.
+//                 Use it for a warning-level check -- Maestro's `optional: true`
+//                 doesn't stop a throwing runScript from failing the flow.
 //   GHOST_BE_URL  optional; defaults to http://127.0.0.1:44678
 //
 // Usage in a flow:
@@ -18,6 +21,12 @@
 // Compare against the string 'true' as shown. Values on `output` cross step boundaries
 // as strings, and a non-empty string is truthy -- a bare `${output.ghostBeVerifyOk}`
 // would pass even when the check failed.
+//
+// A soft check, for a known bug you want flagged but not fatal:
+//   - runScript:
+//       file: ghost-be/verify.js
+//       env: { METHOD: POST, PATH: /v1/search, BODY_CONTAINS: '"page":3', COUNT: "0", SOFT: "true" }
+//   - assertTrue: { condition: "${output.ghostBeVerifyOk == 'true'}", optional: true }
 
 var base = (typeof GHOST_BE_URL !== 'undefined' && GHOST_BE_URL) || 'http://127.0.0.1:44678';
 
@@ -38,15 +47,23 @@ var actual = parseInt(res.body, 10);
 var expected = (typeof COUNT !== 'undefined' && COUNT !== '') ? parseInt(COUNT, 10) : null;
 var ok = (expected === null) ? actual > 0 : actual === expected;
 
-// Written before the throw below, so the assertTrue step still has a value to read.
+// Written before the throw below, so the assertTrue step still has a value to read
+// (and so a SOFT check leaves a value to assert on).
 output.ghostBeVerifyOk = ok ? 'true' : 'false';
 output.ghostBeVerifyCount = String(actual);
 
 if (!ok) {
-    throw new Error(
+    var message =
         'ghost-be: expected ' + (expected === null ? 'at least 1' : expected) +
         ' request(s) matching ' + METHOD + ' ' + PATH +
         (typeof BODY_CONTAINS !== 'undefined' && BODY_CONTAINS ? ' containing "' + BODY_CONTAINS + '"' : '') +
-        ', but saw ' + actual
-    );
+        ', but saw ' + actual;
+
+    // SOFT: log instead of throwing, so the flow carries on and an `optional: true`
+    // assertTrue on ghostBeVerifyOk reports it as a warning.
+    if (typeof SOFT !== 'undefined' && SOFT === 'true') {
+        console.log(message + ' (SOFT: not failing the flow)');
+    } else {
+        throw new Error(message);
+    }
 }

@@ -375,7 +375,7 @@ appId: com.example.app
 |---|---|---|
 | `reset.js` | — | Clears scenarios, counters and journal |
 | `scenario.js` | `SCENARIOS` | Makes exactly those scenarios active (comma-separated; empty string clears) |
-| `verify.js` | `METHOD`, `PATH`, `COUNT`, `BODY_CONTAINS` | Asserts on what the app sent; sets `output.ghostBeVerifyOk` |
+| `verify.js` | `METHOD`, `PATH`, `COUNT`, `BODY_CONTAINS`, `SOFT` | Asserts on what the app sent; sets `output.ghostBeVerifyOk` and `output.ghostBeVerifyCount` |
 | `journal.js` | `METHOD`, `PATH`, `BODY_CONTAINS`, `LIMIT` | Prints matching requests for debugging; never fails a flow |
 
 All four take an optional `GHOST_BE_URL` (default `http://127.0.0.1:44678`).
@@ -389,6 +389,18 @@ Two details that are easy to get wrong:
   Maestro keeps only the `output` object between steps. Function declarations
   don't survive, so a `ghostBe.verify(...)` helper defined in one step wouldn't
   exist in the next.
+- **`optional: true` doesn't soften a failing `verify.js`.** The script throws on
+  a mismatch, and Maestro fails the flow on a throwing `runScript` regardless.
+  For a warning-level check (say, a known bug you want flagged without aborting
+  the journey) pass `SOFT: "true"` — it logs the mismatch instead of throwing —
+  and make the assertion optional:
+
+  ```yaml
+  - runScript:
+      file: ghost-be/verify.js
+      env: { METHOD: POST, PATH: /v1/search, BODY_CONTAINS: '"page":3', COUNT: "0", SOFT: "true" }
+  - assertTrue: { condition: "${output.ghostBeVerifyOk == 'true'}", optional: true }
+  ```
 
 [`maestro/example-flow.yaml`](maestro/example-flow.yaml) is a complete flow
 covering a happy path, a failure branch and a polling step, driving
