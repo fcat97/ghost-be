@@ -270,8 +270,21 @@ rules:
     response: { file: responses/declined.json, status: 402 }
 ```
 
-Copy the `maestro/` scripts from the release archive next to the flows, then
-drive the whole journey:
+The release archive from step 1 extracts a `maestro/` folder next to the
+binary. Copy its scripts into a `ghost-be/` folder beside your flows (the
+flow below refers to them as `ghost-be/*.js`):
+
+```bash
+mkdir -p .maestro/ghost-be
+cp tools/ghost-be/maestro/*.js .maestro/ghost-be/
+```
+
+If `tools/ghost-be/maestro/` doesn't exist, the release you fetched predates
+scenarios and the `/api/test` control API — its server will also reject
+`scenario:`/`responses:` in rule files (`Unknown property 'scenario'`). Fetch
+a newer tag instead of working around it.
+
+Then drive the whole journey:
 
 ```yaml
 appId: <the target app's id>
@@ -305,4 +318,7 @@ Run it with `maestro test <flow>.yaml`. Notes that matter when writing these:
 - `verify.js` is what catches the bugs the UI can't show — wrong payload sent,
   request fired twice, request never fired. Add `journal.js` above a failing
   step to print what the app actually sent.
+- `verify.js` throws on a mismatch, and `optional: true` doesn't stop a
+  throwing `runScript` from failing the flow. For a warning-level check, pass
+  `SOFT: "true"` and put `optional: true` on the `assertTrue` instead.
 - One `ghost-be` per device: scenarios and counters are per-process.
