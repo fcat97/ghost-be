@@ -145,6 +145,11 @@ import 'package:ghost_be/ghost_be.dart';
 final dio = Dio()..interceptors.add(GhostBeInterceptor(baseUrl: 'http://127.0.0.1:44678'));
 ```
 
+Mocked bodies are decoded according to each request's `responseType`
+(JSON, plain text, bytes or stream), so typed/Retrofit calls receive the same
+shape a real response would. If your `Dio` uses a custom `transformer`, pass
+it along too: `GhostBeInterceptor(baseUrl: ..., transformer: dio.transformer)`.
+
 That's it on the app side. Everything else is configuring and running
 `ghost-be`.
 

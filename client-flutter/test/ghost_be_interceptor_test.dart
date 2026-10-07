@@ -36,6 +36,47 @@ void main() {
     expect(utf8.decode(response.data!), '{"ok":true}');
   });
 
+  group('decodes the mocked body according to the request\'s ResponseType', () {
+    late HttpServer ghostBe;
+    late Dio dio;
+
+    setUp(() async {
+      ghostBe = await _stub(jsonEncode({
+        'intercept': true,
+        'status': 200,
+        'headers': {'Content-Type': 'application/json'},
+        'body': base64Encode(utf8.encode('{"ok":true}')),
+      }));
+      dio = Dio()..interceptors.add(GhostBeInterceptor(baseUrl: 'http://127.0.0.1:${ghostBe.port}'));
+    });
+    tearDown(() => ghostBe.close(force: true));
+
+    test('json', () async {
+      final response = await dio.get<Map<String, dynamic>>(
+        'http://example.invalid/dashboard',
+        options: Options(responseType: ResponseType.json),
+      );
+      expect(response.data, {'ok': true});
+    });
+
+    test('plain', () async {
+      final response = await dio.get<String>(
+        'http://example.invalid/dashboard',
+        options: Options(responseType: ResponseType.plain),
+      );
+      expect(response.data, '{"ok":true}');
+    });
+
+    test('stream', () async {
+      final response = await dio.get<ResponseBody>(
+        'http://example.invalid/dashboard',
+        options: Options(responseType: ResponseType.stream),
+      );
+      final bytes = await response.data!.stream.expand((chunk) => chunk).toList();
+      expect(utf8.decode(bytes), '{"ok":true}');
+    });
+  });
+
   test('falls through to the real request when ghost-be says passthrough', () async {
     final ghostBe = await _stub(jsonEncode({'intercept': false}));
     addTearDown(() => ghostBe.close(force: true));
