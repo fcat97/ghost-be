@@ -7,7 +7,15 @@ class GhostBeInterceptor extends Interceptor {
   final String baseUrl;
   final Dio _relayClient = Dio();
 
-  GhostBeInterceptor({this.baseUrl = 'http://127.0.0.1:44678'});
+  /// Decodes mocked bodies into whatever the request's [ResponseType] expects.
+  ///
+  /// Resolving from `onRequest` skips Dio's own transform step, so the
+  /// interceptor runs it itself. Pass the app's `dio.transformer` if it
+  /// customizes JSON decoding; the default matches Dio's own default.
+  final Transformer transformer;
+
+  GhostBeInterceptor({this.baseUrl = 'http://127.0.0.1:44678', Transformer? transformer})
+      : transformer = transformer ?? BackgroundTransformer();
 
   @override
   Future<void> onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
@@ -41,12 +49,30 @@ class GhostBeInterceptor extends Interceptor {
       case PassthroughResponseEnvelope():
         handler.next(options);
       case MockResponseEnvelope(status: final status, headers: final mockHeaders, body: final body):
+        final headers = mockHeaders.map((k, v) => MapEntry(k.toLowerCase(), [v]));
+        final dynamic data;
+        try {
+          data = await transformer.transformResponse(
+            options,
+            ResponseBody(
+              Stream.value(base64Decode(body)),
+              status,
+              headers: headers,
+            ),
+          );
+        } catch (e, st) {
+          handler.reject(
+            DioException(requestOptions: options, error: e, stackTrace: st),
+            true,
+          );
+          return;
+        }
         handler.resolve(
           Response(
             requestOptions: options,
             statusCode: status,
-            headers: Headers.fromMap(mockHeaders.map((k, v) => MapEntry(k, [v]))),
-            data: base64Decode(body),
+            headers: Headers.fromMap(headers),
+            data: data,
           ),
         );
     }
