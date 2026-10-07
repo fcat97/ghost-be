@@ -77,6 +77,74 @@ void main() {
     });
   });
 
+  group('applies the request\'s validateStatus to the mocked status', () {
+    late HttpServer ghostBe;
+    late Dio dio;
+    final onResponseSeen = <int?>[];
+    final onErrorSeen = <int?>[];
+
+    setUp(() async {
+      onResponseSeen.clear();
+      onErrorSeen.clear();
+      ghostBe = await _stub(jsonEncode({
+        'intercept': true,
+        'status': 503,
+        'headers': {'Content-Type': 'application/json'},
+        'body': base64Encode(utf8.encode('{"message":"service unavailable"}')),
+      }));
+      dio = Dio()
+        ..interceptors.add(GhostBeInterceptor(baseUrl: 'http://127.0.0.1:${ghostBe.port}'))
+        ..interceptors.add(InterceptorsWrapper(
+          onResponse: (response, handler) {
+            onResponseSeen.add(response.statusCode);
+            handler.next(response);
+          },
+          onError: (error, handler) {
+            onErrorSeen.add(error.response?.statusCode);
+            handler.next(error);
+          },
+        ));
+    });
+    tearDown(() => ghostBe.close(force: true));
+
+    test('rejected status throws a badResponse DioException carrying the decoded body', () async {
+      final future = dio.get<Map<String, dynamic>>('http://example.invalid/dashboard');
+      await expectLater(
+        future,
+        throwsA(isA<DioException>()
+            .having((e) => e.type, 'type', DioExceptionType.badResponse)
+            .having((e) => e.response?.statusCode, 'status', 503)
+            .having((e) => e.response?.data['message'], 'message', 'service unavailable')),
+      );
+      expect(onErrorSeen, [503]);
+      expect(onResponseSeen, isEmpty);
+    });
+
+    test('accepted status resolves and still runs later onResponse interceptors', () async {
+      final response = await dio.get<Map<String, dynamic>>(
+        'http://example.invalid/dashboard',
+        options: Options(validateStatus: (_) => true),
+      );
+      expect(response.statusCode, 503);
+      expect(response.data, {'message': 'service unavailable'});
+      expect(onResponseSeen, [503]);
+      expect(onErrorSeen, isEmpty);
+    });
+
+    test('receiveDataWhenStatusError: false leaves the error response body empty', () async {
+      final future = dio.get<Map<String, dynamic>>(
+        'http://example.invalid/dashboard',
+        options: Options(receiveDataWhenStatusError: false),
+      );
+      await expectLater(
+        future,
+        throwsA(isA<DioException>()
+            .having((e) => e.response?.statusCode, 'status', 503)
+            .having((e) => e.response?.data, 'data', isNull)),
+      );
+    });
+  });
+
   test('falls through to the real request when ghost-be says passthrough', () async {
     final ghostBe = await _stub(jsonEncode({'intercept': false}));
     addTearDown(() => ghostBe.close(force: true));

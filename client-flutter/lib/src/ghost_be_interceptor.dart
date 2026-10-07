@@ -50,31 +50,49 @@ class GhostBeInterceptor extends Interceptor {
         handler.next(options);
       case MockResponseEnvelope(status: final status, headers: final mockHeaders, body: final body):
         final headers = mockHeaders.map((k, v) => MapEntry(k.toLowerCase(), [v]));
-        final dynamic data;
-        try {
-          data = await transformer.transformResponse(
-            options,
-            ResponseBody(
-              Stream.value(base64Decode(body)),
-              status,
-              headers: headers,
-            ),
-          );
-        } catch (e, st) {
+        // Resolving from `onRequest` also skips Dio's status check, so mirror
+        // what Dio does for a real response: honor `validateStatus` and
+        // `receiveDataWhenStatusError`, and reject non-accepted statuses.
+        final statusOk = options.validateStatus(status);
+        dynamic data;
+        if (statusOk || options.receiveDataWhenStatusError) {
+          try {
+            data = await transformer.transformResponse(
+              options,
+              ResponseBody(
+                Stream.value(base64Decode(body)),
+                status,
+                headers: headers,
+              ),
+            );
+          } catch (e, st) {
+            handler.reject(
+              DioException(requestOptions: options, error: e, stackTrace: st),
+              true,
+            );
+            return;
+          }
+        }
+        final response = Response(
+          requestOptions: options,
+          statusCode: status,
+          headers: Headers.fromMap(headers),
+          data: data,
+        );
+        // `true` lets the app's other interceptors see the mocked response or
+        // error in their onResponse/onError, just as they would a real one.
+        if (statusOk) {
+          handler.resolve(response, true);
+        } else {
           handler.reject(
-            DioException(requestOptions: options, error: e, stackTrace: st),
+            DioException.badResponse(
+              statusCode: status,
+              requestOptions: options,
+              response: response,
+            ),
             true,
           );
-          return;
         }
-        handler.resolve(
-          Response(
-            requestOptions: options,
-            statusCode: status,
-            headers: Headers.fromMap(headers),
-            data: data,
-          ),
-        );
     }
   }
 
